@@ -1,0 +1,50 @@
+direction: right
+
+App: TradingAgents {
+  style.fill: "#e3f2fd"
+  style.stroke: "#1565c0"
+
+  LG: LangGraph
+  Analyst: Analyst节点
+  Research: Research节点
+  Expert: Expert节点
+  Risk: Risk节点
+  CB: |md
+    CallbackHandler()
+    自动注入到所有节点
+  |
+}
+
+LF: Langfuse (自托管) {
+  style.fill: "#e8f5e9"
+  style.stroke: "#388e3c"
+
+  Traces: Traces {
+    style.fill: "#fff8e1"
+    style.stroke: "#f9a825"
+    T1: 输入/输出/延迟/Token数
+    T2: 模型名称/成本
+    T3: 错误日志
+  }
+
+  PM: Prompt Management {
+    style.fill: "#f3e5f5"
+    style.stroke: "#7b1fa2"
+    P1: 版本控制
+    P2: A/B测试
+    P3: 性能对比
+  }
+
+  Dashboard: Dashboard {
+    style.fill: "#fce4ec"
+    style.stroke: "#c62828"
+    D1: 成本趋势
+    D2: Token消耗分布
+    D3: 决策质量评分
+  }
+}
+
+App.Analyst -> LF.Traces: trace
+App.Research -> LF.Traces: trace
+App.Expert -> LF.Traces: trace
+App.Risk -> LF.Traces: trace

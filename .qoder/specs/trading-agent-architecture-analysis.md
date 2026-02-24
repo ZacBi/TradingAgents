@@ -2,87 +2,63 @@
 
 ## 项目概览
 
-**项目**: TradingAgents - 多智能体LLM金融交易框架  
-**核心架构**: LangGraph编排 + 10个专业Agent + ChromaDB记忆  
-**数据源**: YFinance, Finnhub, Reddit, Google News, SimFin  
+**项目**: TradingAgents - 多智能体LLM金融交易框架
+**核心架构**: LangGraph编排 + 10个专业Agent + ChromaDB记忆
+**数据源**: YFinance, Finnhub, Reddit, Google News, SimFin
+**LLM支持**: OpenAI, Anthropic, Google Gemini, Ollama, OpenRouter
+
+### 技术栈
+
+| 组件 | 技术选型 | 版本要求 |
+|------|---------|---------|
+| **工作流编排** | LangGraph StateGraph | >= 0.4.8 |
+| **LLM 框架** | LangChain (openai/anthropic/google-genai) | 多版本 |
+| **向量存储** | ChromaDB (内存模式) | - |
+| **嵌入模型** | OpenAI `text-embedding-3-small` / Ollama `nomic-embed-text` | - |
+| **回测** | Backtrader (仅依赖，未集成) | - |
+| **数据源** | Yahoo Finance, Finnhub, Reddit/PRAW, Google News, SimFin, AKShare, Tushare | - |
+| **UI** | Chainlit Web UI + Rich CLI | - |
+
+### 核心模块与文件
+
+| 模块 | 关键文件 | 职责 |
+|------|---------|------|
+| **图编排** | `tradingagents/graph/trading_graph.py` (255行) | 主Orchestrator，初始化LLM/记忆/工具/图 |
+| **图设置** | `tradingagents/graph/setup.py` (205行) | 构建LangGraph StateGraph，定义节点和边 |
+| **条件逻辑** | `tradingagents/graph/conditional_logic.py` | 控制辩论轮次、工具调用循环 |
+| **信号处理** | `tradingagents/graph/signal_processing.py` | 从详细报告提取BUY/SELL/HOLD |
+| **反思学习** | `tradingagents/graph/reflection.py` (122行) | 基于实际收益进行事后反思 |
+| **分析师** | `tradingagents/agents/analysts/*.py` (4个) | Market / Social / News / Fundamentals |
+| **研究员** | `tradingagents/agents/researchers/*.py` (2个) | Bull / Bear Researcher |
+| **风险管理** | `tradingagents/agents/risk_mgmt/*.py` (3个) | Aggressive / Conservative / Neutral |
+| **管理层** | `tradingagents/agents/managers/*.py` (2个) | Research Manager / Risk Manager |
+| **交易员** | `tradingagents/agents/trader/trader.py` | 生成交易提案 |
+| **记忆系统** | `tradingagents/agents/utils/memory.py` (114行) | ChromaDB + Embedding向量记忆 |
+| **工具箱** | `tradingagents/agents/utils/agent_utils.py` (419行) | Toolkit类，19+ 个@tool方法 |
+| **配置** | `tradingagents/default_config.py` | 全局配置（LLM/辩论轮数/工具模式） |
+
+### 完整执行流程
+
+```
+START
+  → Market Analyst (串行) → tools_market → Msg Clear
+  → Social Analyst (串行) → tools_social → Msg Clear
+  → News Analyst (串行) → tools_news → Msg Clear
+  → Fundamentals Analyst (串行) → tools_fundamentals → Msg Clear
+  → Bull Researcher ⇄ Bear Researcher (max_debate_rounds=1, 共2轮)
+  → Research Manager (deep_thinking_llm 裁判)
+  → Trader (生成交易提案)
+  → Risky Analyst → Safe Analyst → Neutral Analyst (max_risk_discuss_rounds=1, 共3轮)
+  → Risk Judge (deep_thinking_llm 最终裁判)
+  → SignalProcessor 提取 BUY/SELL/HOLD
+END
+```
 
 ---
 
 ## 一、当前架构（As-Is）
 
-```d2
-direction: down
-
-title: 当前 TradingAgents 架构 {
-  near: top-center
-  shape: text
-  style.font-size: 24
-  style.bold: true
-}
-
-DataLayer: 数据层 (硬编码，无统一接口) {
-  style.fill: "#fff3e0"
-  YF: YFinance
-  FH: Finnhub
-  RD: Reddit
-  GN: Google News
-}
-
-AnalystLayer: 分析师层 (串行，固定4个，相同LLM) {
-  style.fill: "#fff8e1"
-  direction: right
-  MA: Market Analyst -> SA: Social Analyst -> NA: News Analyst -> FA: Fundamentals
-}
-
-ResearchLayer: 研究层 (固定轮次辩论 max_rounds=1) {
-  style.fill: "#e8f5e9"
-  Bull: Bull Researcher
-  Bear: Bear Researcher
-  RM: Research Manager
-  Bull <-> Bear: 固定2轮
-  Bull -> RM
-  Bear -> RM
-}
-
-ExecLayer: 执行层 (固定轮次) {
-  style.fill: "#e3f2fd"
-  Trader
-  Risky
-  Safe
-  Neutral
-  RiskMgr: Risk Manager
-  Output: BUY / SELL / HOLD {
-    shape: parallelogram
-  }
-  Trader -> Risky
-  Trader -> Safe
-  Trader -> Neutral
-  Risky -> RiskMgr
-  Safe -> RiskMgr
-  Neutral -> RiskMgr
-  RiskMgr -> Output
-}
-
-Infra: 基础设施层 {
-  style.fill: "#f3e5f5"
-  ChromaDB: ChromaDB (简单向量存储)
-  LLM: |md
-    LLM: 仅2层 quick_think / deep_think
-    所有同层Agent共享同一模型
-  |
-}
-
-Missing: |md
-  ❌ 无持仓管理  ❌ 无可观测性  ❌ 无状态持久化
-  ❌ 无价值投资  ❌ 无专家系统  ❌ 无财报跟踪
-| {
-  style.fill: "#fee"
-  style.stroke: "#f66"
-  style.font-color: "#c00"
-}
-
-DataLayer -> AnalystLayer -> ResearchLayer -> ExecLayer
-```
+> D2架构图: [`docs/arch/01-current-architecture.d2`](../../docs/arch/01-current-architecture.d2)
 
 **核心局限**:
 - 分析师固定4个，串行执行，无法扩展
@@ -92,164 +68,119 @@ DataLayer -> AnalystLayer -> ResearchLayer -> ExecLayer
 - 无持仓管理、无交易记录
 - 无可观测性、无Prompt版本管理
 
+### 1.1 Prompt设计局限性
+
+| 问题点 | 描述 | 优先级 | 复杂度 |
+|--------|------|--------|--------|
+| **静态模板化Prompt** | 所有Agent使用硬编码系统提示词，无动态上下文适配 | P1 | 中 |
+| **缺少Few-shot示例** | Prompt中未嵌入高质量交易决策示例，依赖零样本推理 | P1 | 低 |
+| **角色定义模糊** | Bull/Bear研究员侧重"辩论"而非"风险量化"，易导致情绪化论证 | P0 | 中 |
+| **无结构化输出约束** | Agent输出为自由文本，缺少JSON Schema约束 | P1 | 低 |
+| **缺少思维链引导** | 未使用CoT引导推理步骤，复杂决策透明度低 | P2 | 低 |
+| **ReAct范式缺失** | 工具调用与推理割裂，无"观察→思考→行动"循环 | P1 | 中 |
+
+**关键代码证据**:
+- `bull_researcher.py:25-43`: Prompt是大字符串直接拼接所有报告，无结构化推理指引
+- `market_analyst.py:24-50`: 技术指标说明详尽但缺少分析方法论
+- `reflection.py:17-47`: 反思有一定结构，但仅限事后反思
+
+### 1.2 与前沿AI Trading研究的差距
+
+| 研究前沿 | 当前实现 | 差距 | 优先级 |
+|----------|----------|------|--------|
+| **FinGPT范式** | 无领域持续预训练 | 未使用金融语料微调LLM | P2 |
+| **AlphaSignal方法** | 无信号融合框架 | Agent输出未量化为标准化信号（-1到+1） | P0 |
+| **Reflection机制** | 简单成功/失败反思 | 未实现迭代改进（如Self-RAG） | P1 |
+| **多模态分析** | 纯文本处理 | 未整合K线图、财报图表等视觉信息 | P2 |
+| **因果推断** | 相关性分析 | 未区分相关性与因果性 | P1 |
+| **不确定性量化** | 无置信度输出 | 决策为确定性的BUY/SELL/HOLD | P1 |
+| **市场Regime识别** | 无市场状态分类 | 无Regime Switching模型 | P1 |
+
+### 1.3 记忆系统局限性
+
+| 问题点 | 描述 | 优先级 |
+|--------|------|--------|
+| **简单向量检索** | 仅使用余弦相似度，无时间衰减、重要性加权 | P1 |
+| **无分层记忆** | 混合短期交易记忆与长期市场规律 | P1 |
+| **非持久化** | `chromadb.Client()` 纯内存模式，重启即丢失 | P0 |
+| **记忆隔离** | 5个Agent记忆完全隔离，无跨Agent知识共享 | P1 |
+
 ---
 
 ## 二、目标架构（To-Be）
 
-```d2
-direction: down
+> D2架构图: [`docs/arch/02-target-architecture.d2`](../../docs/arch/02-target-architecture.d2)
 
-title: 升级后 TradingAgents 架构 {
-  near: top-center
-  shape: text
-  style.font-size: 24
-  style.bold: true
-}
+### 2.1 新Agent集成策略（代码级分析结论）
 
-Observe: 可观测层 - Langfuse (自托管) {
-  style.fill: "#e8eaf6"
-  style.stroke: "#3f51b5"
-  Tracing: Tracing: 全链路追踪
-  PromptMgmt: Prompt Management: 版本控制 + A/B测试
-  CostTrack: Cost Tracking: 每节点Token消耗
-  Eval: Evaluation: 决策质量评分
-}
+基于对 `setup.py`、`conditional_logic.py`、`agent_states.py` 的代码审查，新Agent**不能替换**现有节点，必须**新增**：
 
-LLMGateway: LLM网关层 - LiteLLM {
-  style.fill: "#fce4ec"
-  style.stroke: "#e91e63"
-  direction: right
-  Google: Google Gemini
-  Bailian: 百炼 Qwen/DS
-  OpenRouter: OpenRouter GPT/Claude
-  Ollama: Ollama 本地模型
-  UnifiedAPI: |md
-    **统一API接口**
-    自动fallback / 成本路由 / 负载均衡
-  |
-  Google -> UnifiedAPI
-  Bailian -> UnifiedAPI
-  OpenRouter -> UnifiedAPI
-  Ollama -> UnifiedAPI
-}
+| 新Agent | 替换现有? | 集成方式 | 代码层面原因 |
+|---------|----------|---------|-------------|
+| **Expert Team**<br>(Buffett/Munger/Lynch等) | **否** | 新增"价值队伍"并行节点 | `InvestDebateState` 硬编码 `bull_history`/`bear_history` 二元结构；<br>`should_continue_debate()` 硬编码 Bull↔Bear 路由；<br>Expert做独立评估 ≠ 对抗性辩论 |
+| **Deep Research** | **否** | 新增POST-STAGE节点 | 4个Analyst各有专项工具链（YFin/Reddit/Finnhub/SimFin），功能互补非重叠；<br>Deep Research做综合交叉验证，可引用4份报告增强深度 |
 
-DataLayer: 数据层 {
-  style.fill: "#fff3e0"
-  style.stroke: "#ff9800"
-  Free: 免费数据源 {
-    YF: Yahoo Finance (主力)
-    FRED: FRED (宏观经济)
-    FH: Finnhub (新闻)
-    RD: Reddit (情绪)
-  }
-  Paid: 付费数据源 {
-    style.fill: "#fff8e1"
-    Longport: |md
-      长桥 Longport API
-      港/美/A股实时行情+交易
-    |
-  }
-}
+### 2.2 升级后工作流
 
-AgentOrch: Agent编排层 - LangGraph 1.0 {
-  style.fill: "#e8f5e9"
-  style.stroke: "#4caf50"
-  
-  Features: |md
-    **特性**: Checkpointing | Subgraph | Human-in-the-Loop | Streaming
-  | {
-    shape: text
-    style.font-size: 12
-  }
+```mermaid
+flowchart TD
+    subgraph Phase1["阶段1: 数据收集 (可并行)"]
+        direction LR
+        MA["Market Analyst"] & SA["Social Analyst"] & NA["News Analyst"] & FA["Fundamentals Analyst"]
+    end
 
-  Phase1: 阶段1: 数据收集 (并行) {
-    style.fill: "#c8e6c9"
-    MA: Market Analyst
-    NA: News Analyst
-    SA: Social Analyst
-    FA: Fundamentals
-    Reports: 4份分析报告
-    DeepRes: Deep Research Agent (可选)
-    DeepReport: 深度研究报告
-    Earnings: Earnings Tracker (可选)
-    EarningsAlert: 财报预警
-    MA -> Reports
-    NA -> Reports
-    SA -> Reports
-    FA -> Reports
-    DeepRes -> DeepReport
-    Earnings -> EarningsAlert
-  }
+    subgraph DeepR["Deep Research (POST-STAGE, 可选)"]
+        DR["Deep Research Agent\n多步Web搜索+综合验证"]
+    end
 
-  Phase2: 阶段2: 多视角分析 {
-    style.fill: "#a5d6a7"
-    TrendTeam: 趋势/投机团队 {
-      Bull: Bull Researcher
-      Bear: Bear Researcher
-      Bull <-> Bear: 动态收敛辩论
-    }
-    ValueTeam: 价值投资团队 (动态选择N个专家) {
-      Buffett: Buffett Agent
-      Munger: Munger Agent
-      Lynch: Lynch Agent
-      Livermore: Livermore Agent
-      MoreExperts: ... (可扩展注册)
-    }
-    RM: Research Manager (综合裁决)
-    TrendTeam -> RM
-    ValueTeam -> RM
-  }
+    subgraph Phase2["阶段2: 多视角分析"]
+        subgraph TrendTeam["趋势/投机团队 (保留现有)"]
+            Bull["Bull Researcher"] <-->|"对抗性辩论\n动态收敛"| Bear["Bear Researcher"]
+        end
+        subgraph ValueTeam["价值投资团队 (新增, 并行)"]
+            direction LR
+            Buffett["Buffett Agent"] & Munger["Munger Agent"] & Lynch["Lynch Agent"] & Livermore["Livermore Agent"]
+        end
+        RM["Research Manager\n综合裁决: 趋势观点 + 专家评估"]
+        TrendTeam --> RM
+        ValueTeam --> RM
+    end
 
-  Phase3: 阶段3: 风险评估 + 执行 {
-    style.fill: "#81c784"
-    Trader
-    RiskTeam: Risk Team (动态收敛辩论)
-    RiskMgr: Risk Manager
-    FinalDecision: BUY/SELL/HOLD + 仓位 + 止损 {
-      shape: parallelogram
-    }
-    Trader -> RiskTeam -> RiskMgr -> FinalDecision
-  }
+    subgraph Phase3["阶段3: 执行 + 风险"]
+        Trader["Trader"] --> RiskTeam["Risk Team\n(Risky/Safe/Neutral)"]
+        RiskTeam --> RiskMgr["Risk Manager"]
+        RiskMgr --> Final["BUY/SELL/HOLD\n+ 仓位 + 止损"]
+    end
 
-  Phase1 -> Phase2 -> Phase3
-}
+    Phase1 --> DeepR --> Phase2 --> Phase3
 
-Persist: 持久化层 {
-  style.fill: "#f3e5f5"
-  style.stroke: "#9c27b0"
-  SQLiteDB: SQLite 数据库 {
-    Positions: positions (持仓)
-    Trades: trades (交易记录)
-    Decisions: agent_decisions (决策日志)
-    NAV: daily_nav (净值曲线)
-  }
-  ChromaDBE: ChromaDB (增强) {
-    Working: 工作记忆 (当日)
-    Episodic: 情节记忆 (历史案例)
-    Semantic: 语义记忆 (市场规律)
-  }
-  Checkpoints: |md
-    LangGraph Checkpoints
-    状态快照，支持回滚/重放
-  |
-}
-
-Display: 展示层 (渐进式) {
-  style.fill: "#e0f7fa"
-  style.stroke: "#00bcd4"
-  direction: right
-  CLI: CLI (已有) -> Streamlit: Streamlit Dashboard -> WebApp: FastAPI + React
-}
-
-# 连接关系
-Observe -> AgentOrch: 监控所有Agent节点 {
-  style.stroke-dash: 3
-}
-LLMGateway.UnifiedAPI -> AgentOrch
-DataLayer -> AgentOrch
-AgentOrch -> Persist
-Persist -> Display
+    style Phase1 fill:#c8e6c9,stroke:#388e3c
+    style DeepR fill:#bbdefb,stroke:#1565c0
+    style TrendTeam fill:#fff9c4,stroke:#f9a825
+    style ValueTeam fill:#e1bee7,stroke:#7b1fa2
+    style Phase3 fill:#ffccbc,stroke:#e64a19
 ```
+
+### 2.3 关键状态变更
+
+| 修改项 | 文件 | 变更 |
+|--------|------|------|
+| `AgentState` 新增字段 | `agents/utils/agent_states.py` | `deep_research_report: str`<br>`expert_evaluations: dict` |
+| `InvestDebateState` 扩展 | `agents/utils/agent_states.py` | `expert_team: dict` (不修改现有bull/bear字段) |
+| `ConditionalLogic` 新方法 | `graph/conditional_logic.py` | `should_route_to_experts()`: 辩论结束后路由到Expert Team |
+| `setup_graph()` 新节点 | `graph/setup.py` | 添加Deep Research节点 + 4个Expert节点 + 边定义 |
+| `Research Manager` Prompt | `agents/managers/research_manager.py` | 判决时同时考虑 Bull/Bear辩论 + Expert独立评估 |
+
+目标架构核心变化:
+- **可观测层**: Langfuse自托管，全链路追踪 + Prompt版本管理 + 成本追踪
+- **LLM网关层**: LiteLLM统一多平台（Google/百炼/OpenRouter/Ollama），自动fallback + 成本路由
+- **数据层**: 免费(YFinance+FRED+Finnhub+Reddit) + 付费(长桥Longport)
+- **编排层**: LangGraph 1.0 (Checkpointing/Subgraph/Streaming)
+  - 阶段1: 数据收集（并行Analyst + Deep Research + Earnings Tracker）
+  - 阶段2: 多视角分析（趋势团队Bull/Bear + **价值投资团队Buffett/Munger/Lynch/Livermore** + Research Manager综合裁决）
+  - 阶段3: 风险评估 + 执行（输出方向+仓位+止损）
+- **持久化层**: SQLite(持仓/交易/决策/净值) + ChromaDB增强(工作/情节/语义三层记忆) + Checkpoints
+- **展示层**: CLI → Streamlit → FastAPI+React（渐进式）
 
 ---
 
@@ -261,13 +192,8 @@ Persist -> Display
 - 通过LiteLLM网关统一管理Google Pro、百炼、OpenRouter等多平台
 - 支持**fallback链**：首选模型失败时自动降级
 - 支持**成本路由**：优先使用免费额度，超额后切换低价模型
-- 后续收益稳定后可**一键切换**全部使用最佳模型
 
-### 3.2 节点-模型映射（可配置，非固定）
-
-每个节点定义一个**角色类型**（role_type），通过配置文件映射到具体模型。
-
-**当前可用模型池** (截至2026年2月):
+### 3.2 节点-模型映射（可配置）
 
 | 平台 | 轻量/快速模型 | 标准模型 | 旗舰/推理模型 |
 |------|-------------|---------|-------------|
@@ -292,33 +218,15 @@ Persist -> Display
 
 ```yaml
 # model_routing.yaml
-
-# ===== 模型别名定义 =====
-# 所有profile通过别名引用模型，新模型上线只需修改此处
 model_aliases:
-  # --- 轻量级 ---
   gemini_flash: "gemini/gemini-3-flash"
   qwen_turbo: "dashscope/qwen3-turbo"
-  gpt_mini: "openrouter/openai/gpt-4.5-mini"
-  haiku: "openrouter/anthropic/claude-haiku-4"
-  deepseek_v3: "openrouter/deepseek/deepseek-v3.2"
-  # --- 标准级 ---
   gemini_pro: "gemini/gemini-3-pro"
-  qwen_max: "dashscope/qwen3-max"
-  gpt_std: "openrouter/openai/gpt-4.5"
-  sonnet: "openrouter/anthropic/claude-sonnet-4"
-  # --- 旗舰/推理 ---
-  gemini_top: "gemini/gemini-3.1-pro"
-  gemini_think: "gemini/gemini-3-deep-think"
-  qwen_plus: "dashscope/qwen3.5-plus"
   gpt_reasoning: "openrouter/openai/o4-mini"
-  gpt_top: "openrouter/openai/o3"
-  opus: "openrouter/anthropic/claude-opus-4.5"
-  deepseek_r2: "openrouter/deepseek/deepseek-r2-pro"
+  # ...
 
-# ===== 角色-模型映射 Profiles =====
 profiles:
-  cost_saving:  # 省钱模式 (优先免费额度)
+  cost_saving:
     data_analyst: "${gemini_flash}"
     researcher: "${qwen_turbo}"
     expert: "${gemini_pro}"
@@ -326,28 +234,24 @@ profiles:
     critical_decision: "${gpt_reasoning}"
     fallback_chain: ["${deepseek_v3}", "${qwen_turbo}"]
 
-  balanced:  # 平衡模式
+  balanced:
     data_analyst: "${gemini_flash}"
     researcher: "${sonnet}"
     expert: "${gemini_pro}"
     judge: "${gpt_std}"
     critical_decision: "${gpt_reasoning}"
-    fallback_chain: ["${qwen_max}", "${gemini_pro}"]
 
-  best_quality:  # 最佳质量模式
+  best_quality:
     data_analyst: "${gpt_std}"
     researcher: "${opus}"
     expert: "${gemini_top}"
     judge: "${gpt_top}"
     critical_decision: "${gpt_top}"
-    fallback_chain: ["${opus}", "${gemini_think}"]
 
 active_profile: "balanced"
 ```
 
 ### 3.4 模型生命周期管理
-
-模型迭代速度极快（每1-2个月有新模型发布），需要一套机制确保系统持续使用最优模型：
 
 ```mermaid
 flowchart TD
@@ -363,7 +267,7 @@ flowchart TD
 
     subgraph UpdateFlow["模型更新流程"]
         direction TB
-        NewModel["新模型发布\n(如 Gemini 4, GPT-6, Qwen4)"] 
+        NewModel["新模型发布"] 
         Step1["1. LiteLLM自动识别新模型"]
         Step2["2. 在YAML中新增/修改alias"]
         Step3["3. 热加载配置 (无需重启)"]
@@ -371,19 +275,12 @@ flowchart TD
         NewModel --> Step1 --> Step2 --> Step3 --> Step4
     end
 
-    subgraph Safeguard["安全保障"]
-        Fallback["fallback_chain: 主模型不可用时\n自动降级到备用模型"]
-        Deprecation["模型废弃预警:\n监控Provider deprecation通知"]
-    end
-
     AutoSync --> AliasLayer
     AliasLayer --> UpdateFlow
-    UpdateFlow --> Safeguard
 
     style AutoSync fill:#e3f2fd,stroke:#1565c0
     style AliasLayer fill:#e8f5e9,stroke:#388e3c
     style UpdateFlow fill:#fff3e0,stroke:#e65100
-    style Safeguard fill:#fce4ec,stroke:#c62828
 ```
 
 **核心设计**: 三层解耦
@@ -394,23 +291,19 @@ flowchart TD
 | **别名层** (model_aliases) | 将模型名映射为语义化别名 | 修改1行YAML |
 | **Profile层** (profiles) | 角色到别名的映射 | 通常无需修改 |
 
-**更新模型只需改一处**: 例如 Gemini 4 发布后，只需将 `gemini_pro: "gemini/gemini-3-pro"` 改为 `gemini_pro: "gemini/gemini-4-pro"`，所有引用该别名的profile自动生效。
-
-**LiteLLM 热加载**: 支持通过 API 调用 `/model/update` 动态更新模型配置，无需重启服务。
-
-### 3.4 LLM网关架构
+### 3.5 LLM网关架构
 
 ```mermaid
 flowchart TD
     Agent["Agent节点"] -->|role_type| Config["model_routing.yaml\n别名解析"]
     Config -->|实际model_name| Gateway["LiteLLM Gateway\n统一 OpenAI 兼容 API\nlocalhost:4000"]
 
-    Gateway -->|路由策略| Strategy{"按Profile映射\n自动fallback\n速率限制\n成本追踪\n热加载配置"}
+    Gateway -->|路由策略| Strategy{"按Profile映射\n自动fallback\n速率限制\n成本追踪"}
 
-    Strategy --> G["Google Pro\nGemini 3 Flash/Pro/3.1 Pro\nGemini 3 Deep Think"]
-    Strategy --> B["百炼\nQwen3-Turbo/Max\nQwen3.5-Plus"]
-    Strategy --> O["OpenRouter\nGPT-4.5/o3/o4-mini\nClaude Sonnet 4/Opus 4.5\nDeepSeek-V3.2/R2"]
-    Strategy --> L["Ollama\nLlama 4 (本地)\n离线可用"]
+    Strategy --> G["Google Pro\nGemini 3 Flash/Pro/3.1 Pro"]
+    Strategy --> B["百炼\nQwen3-Turbo/Max/3.5-Plus"]
+    Strategy --> O["OpenRouter\nGPT-4.5/o3/Claude/DeepSeek"]
+    Strategy --> L["Ollama\nLlama 4 (本地)"]
 
     style Gateway fill:#e3f2fd,stroke:#1565c0
     style Strategy fill:#fff8e1,stroke:#f9a825
@@ -429,63 +322,21 @@ flowchart TD
 
 ### 4.2 专家注册与发现架构
 
-```d2
-direction: down
+> D2架构图: [`docs/arch/03-expert-registry.d2`](../../docs/arch/03-expert-registry.d2)
 
-Registry: Expert Agent Registry {
-  style.fill: "#e8f5e9"
-  style.stroke: "#388e3c"
+**已注册专家池**:
 
-  Profile: ExpertProfile (注册信息) {
-    style.fill: "#fff8e1"
-    style.stroke: "#f9a825"
-    content: |md
-      - name | philosophy | style
-      - best_for: sectors, market_cap, volatility
-      - prompt_template | role_type
-    |
-  }
-
-  Experts: 已注册专家池 {
-    style.fill: "#c8e6c9"
-    Graham: Ben Graham\n深度价值, 烟蒂股
-    Buffett: Warren Buffett\n护城河, 长期持有
-    Munger: Charlie Munger\n多元思维, 逆向检验
-    Lynch: Peter Lynch\n成长价值, PEG
-    Livermore: Jesse Livermore\n趋势投机, 关键点
-    Greenblatt: Joel Greenblatt\n魔法公式, 量化
-    Marks: Howard Marks\n周期投资, 风险意识
-    Dalio: Ray Dalio\n全天候, 宏观对冲
-    Custom: ... 自定义专家\n用户可注册新专家
-  }
-}
-
-Selector: Expert Selector (动态选择器) {
-  style.fill: "#e3f2fd"
-  style.stroke: "#1565c0"
-
-  Input: |md
-    **输入:**
-    - 股票特征 (行业/市值/波动率/PE)
-    - 市场环境 (牛/熊/震荡)
-    - 用户偏好 (可选)
-  |
-
-  Strategy: |md
-    **选择策略:**
-    - 特征匹配 best_for
-    - 多样性保障
-    - 数量控制 2~5个
-    - 用户覆盖
-  |
-
-  Output: 输出: 选定的专家Agent列表
-
-  Input -> Strategy -> Output
-}
-
-Registry -> Selector
-```
+| 专家 | 投资哲学 | 适用场景 |
+|------|---------|---------|
+| **Ben Graham** | 深度价值，烟蒂股，安全边际 | 低估值小盘、危机中的优质资产 |
+| **Warren Buffett** | 护城河，长期持有，"wonderful company at fair price" | 大盘蓝筹、消费品、金融 |
+| **Charlie Munger** | 多元思维模型，逆向检验，避免愚蠢 | 所有场景（元思维层面审查） |
+| **Peter Lynch** | 成长价值(GARP)，PEG比率，"invest in what you know" | 中小盘成长股 |
+| **Jesse Livermore** | 趋势投机，关键点位，市场时机 | 高波动、趋势明确的标的 |
+| **Joel Greenblatt** | 魔法公式（高ROIC+低EV/EBIT），量化价值 | 批量筛选低估值标的 |
+| **Howard Marks** | 周期投资，风险意识，"第二层思维" | 周期股、市场极端时期 |
+| **Ray Dalio** | 全天候策略，风险平价，宏观债务周期 | 宏观环境剧变、资产配置 |
+| **自定义** | 用户可注册新专家 | 按需扩展 |
 
 ### 4.3 动态选择示例
 
@@ -498,8 +349,6 @@ Registry -> Selector
 | 用户指定 | 任意 | 用户选择 | 完全自定义 |
 
 ### 4.4 专家统一接口协议
-
-每个专家Agent遵循统一的输入/输出协议:
 
 **输入**:
 - 4份分析师报告（技术/情绪/新闻/基本面）
@@ -567,20 +416,19 @@ flowchart TD
         API4["get_earnings_calendar(ticker) ← 新增"]
         API5["get_macro_indicators() ← 新增"]
         API6["get_institutional_holdings(ticker) ← 新增"]
-        API7["get_news(ticker, source)"]
     end
 
     Interface --> FreeLayer & PaidLayer
 
     subgraph FreeLayer["免费层 (默认)"]
-        YF["Yahoo Finance\n价格/财务/估值/财报日期/机构持仓"]
+        YF["Yahoo Finance\n价格/财务/估值/财报日期"]
         FRED["FRED\nCPI/GDP/利率/失业率/M2"]
         Finnhub["Finnhub\n新闻/基本面"]
         Reddit["Reddit\n社交情绪"]
     end
 
     subgraph PaidLayer["付费层 (可选)"]
-        Longport["长桥 Longport API\n实时行情/K线/港美A股/程序化交易"]
+        Longport["长桥 Longport API\n实时行情/K线/港美A股/交易"]
     end
 
     style Interface fill:#e3f2fd,stroke:#1565c0
@@ -598,11 +446,21 @@ flowchart TD
 | **宏观经济** | FRED API (CPI, GDP, 利率曲线) | 宏观环境判断 |
 | **实时行情** | 长桥 QuoteContext | 盘中交易信号 |
 
+### 6.3 数据完整性缺失分析
+
+| 数据类型 | 重要性 | 当前状态 | 优先级 |
+|----------|--------|----------|--------|
+| **期权链数据** | 极高 | 无 | P0 |
+| **Level 2数据** | 高 | 无（仅Level 1价格） | P1 |
+| **机构持仓变动** | 高 | 仅有Insider Transactions | P1 |
+| **卖空数据** | 高 | 无 | P0 |
+| **宏观经济指标** | 高 | 仅有新闻提及 | P1 |
+
 ---
 
 ## 七、价值投资框架
 
-### 7.1 价值投资分析流程图
+### 7.1 价值投资分析流程
 
 ```mermaid
 flowchart TD
@@ -622,16 +480,9 @@ flowchart TD
     style S3 fill:#fff3e0,stroke:#e65100
     style S4 fill:#f3e5f5,stroke:#7b1fa2
     style S5 fill:#fce4ec,stroke:#c62828
-    style S1D fill:#f5f5f5,stroke:#bbb
-    style S2D fill:#f5f5f5,stroke:#bbb
-    style S3D fill:#f5f5f5,stroke:#bbb
-    style S4D fill:#f5f5f5,stroke:#bbb
-    style S5D fill:#f5f5f5,stroke:#bbb
 ```
 
 ### 7.2 财报跟踪功能
-
-**目标**: 自动监控持仓和关注列表的财报发布时间，在财报前自动触发深度分析
 
 ```mermaid
 flowchart TD
@@ -658,7 +509,7 @@ flowchart TD
 
 ## 八、Deep Research集成
 
-### 8.1 Deep Research在交易流程中的位置
+### 8.1 在交易流程中的位置
 
 ```mermaid
 flowchart LR
@@ -691,11 +542,32 @@ flowchart LR
 - 财报前深度调研
 - 持仓出现重大波动
 
+### 8.2 原生API集成（绕过LangChain封装）
+
+| 平台 | API | 模型 | 特点 |
+|------|-----|------|------|
+| **OpenAI** | Responses API `client.responses.create()` | o3-deep-research, o4-mini-deep-research | 内置web_search_preview，异步长时运行 |
+| **Gemini** | Interactions API `client.interactions.create()` | deep-research-pro | Google Search grounding，异步交互 |
+
+| 应用场景 | 研究查询示例 | 使用的API |
+|---------|------------|-----------|
+| **宏观经济环境** | "当前美联储利率政策对科技股的影响分析" | OpenAI o3-deep-research |
+| **公司深度调研** | "{ticker} 最新财报、管理层变动、竞争格局" | Gemini deep-research-pro |
+| **行业趋势** | "{ticker} 所在行业的技术变革和监管风险" | OpenAI o4-mini-deep-research |
+| **事件驱动** | "{ticker} 近期重大新闻事件及市场影响评估" | Gemini deep-research-pro |
+
 ---
 
-## 九、持仓管理与数据库
+## 九、持仓管理与数据留痕
 
-### 9.1 数据库架构
+### 9.1 设计原则
+
+- **全链路留痕**: 所有抓取的外部数据（新闻、行情、财务、情绪、Deep Research）必须持久化保存
+- **决策可追溯**: 每个交易决策可回溯到触发它的所有原始数据
+- **回测可复现**: 基于历史保存的数据重放，确保回测结果与实盘决策一致
+- **数据分离**: 原始数据(raw)与Agent分析报告(processed)分层存储
+
+### 9.2 数据库架构
 
 ```mermaid
 erDiagram
@@ -729,8 +601,11 @@ erDiagram
         text market_report
         text sentiment_report
         text news_report
+        text fundamentals_report
         text debate_history
+        text expert_opinions
         text risk_assessment
+        datetime created_at
     }
 
     daily_nav {
@@ -742,9 +617,163 @@ erDiagram
         float cumulative_return
     }
 
+    raw_market_data {
+        int id PK
+        string ticker
+        date trade_date
+        text price_data_json
+        text indicators_json
+        string source
+        datetime fetched_at
+    }
+
+    raw_news {
+        int id PK
+        string ticker
+        string source
+        string title
+        text content
+        text url
+        datetime published_at
+        datetime fetched_at
+    }
+
+    raw_social_sentiment {
+        int id PK
+        string ticker
+        string platform
+        text raw_posts_json
+        float sentiment_score
+        int post_count
+        date target_date
+        datetime fetched_at
+    }
+
+    raw_fundamentals {
+        int id PK
+        string ticker
+        string data_type
+        text data_json
+        string source
+        date report_date
+        datetime fetched_at
+    }
+
+    raw_deep_research {
+        int id PK
+        string ticker
+        string provider
+        string model
+        text query
+        text report_markdown
+        text sources_json
+        string trigger_reason
+        int tokens_used
+        float cost
+        datetime started_at
+        datetime completed_at
+    }
+
+    raw_macro_data {
+        int id PK
+        string indicator
+        float value
+        date observation_date
+        string source
+        datetime fetched_at
+    }
+
+    decision_data_links {
+        int id PK
+        int decision_id FK
+        string data_type
+        int data_id
+    }
+
     positions ||--o{ trades : "持仓产生交易"
     agent_decisions ||--o{ trades : "决策触发交易"
+    agent_decisions ||--o{ decision_data_links : "决策引用数据"
+    decision_data_links }o--|| raw_market_data : "行情数据"
+    decision_data_links }o--|| raw_news : "新闻数据"
+    decision_data_links }o--|| raw_social_sentiment : "情绪数据"
+    decision_data_links }o--|| raw_fundamentals : "基本面数据"
+    decision_data_links }o--|| raw_deep_research : "深度研究"
 ```
+
+### 9.3 数据留痕策略
+
+| 数据类型 | 存储表 | 触发时机 | 保留策略 |
+|----------|--------|----------|----------|
+| **行情数据** | `raw_market_data` | 每次Analyst调用YFinance/长桥 | 永久（压缩归档） |
+| **新闻文章** | `raw_news` | News Analyst获取新闻时 | 永久 |
+| **社交情绪** | `raw_social_sentiment` | Social Analyst获取Reddit/情绪时 | 永久 |
+| **财务数据** | `raw_fundamentals` | Fundamentals Analyst获取报表时 | 永久 |
+| **Deep Research** | `raw_deep_research` | Deep Research Agent完成研究时 | 永久 |
+| **宏观指标** | `raw_macro_data` | 获取FRED数据时 | 永久 |
+| **Agent报告** | `agent_decisions` | 每次决策完成时 | 永久 |
+| **决策-数据关联** | `decision_data_links` | 决策生成时自动关联 | 随决策 |
+
+### 9.4 数据留痕流程
+
+```mermaid
+flowchart TD
+    subgraph Fetch["数据抓取层"]
+        direction LR
+        F1["Market Data\nYFinance/长桥"]
+        F2["News\nFinnhub/Google"]
+        F3["Social\nReddit/PRAW"]
+        F4["Fundamentals\nSimFin/Finnhub"]
+        F5["Deep Research\nOpenAI/Gemini"]
+        F6["Macro\nFRED"]
+    end
+
+    subgraph Persist["数据留痕层 (写入SQLite)"]
+        direction LR
+        P1["raw_market_data"]
+        P2["raw_news"]
+        P3["raw_social_sentiment"]
+        P4["raw_fundamentals"]
+        P5["raw_deep_research"]
+        P6["raw_macro_data"]
+    end
+
+    subgraph Analyze["Agent分析层"]
+        direction LR
+        A1["Market Analyst"]
+        A2["News Analyst"]
+        A3["Social Analyst"]
+        A4["Fundamentals Analyst"]
+    end
+
+    subgraph Decision["决策层"]
+        DEC["agent_decisions"]
+        LINK["decision_data_links\n(关联所有原始数据ID)"]
+        DEC --> LINK
+    end
+
+    F1 --> P1 --> A1
+    F2 --> P2 --> A2
+    F3 --> P3 --> A3
+    F4 --> P4 --> A4
+    F5 --> P5
+    F6 --> P6
+
+    A1 & A2 & A3 & A4 --> Decision
+    P1 & P2 & P3 & P4 & P5 & P6 -.->|data_id| LINK
+
+    style Fetch fill:#fff3e0,stroke:#e65100
+    style Persist fill:#e8f5e9,stroke:#388e3c
+    style Analyze fill:#e3f2fd,stroke:#1565c0
+    style Decision fill:#f3e5f5,stroke:#7b1fa2
+```
+
+### 9.5 实现要点
+
+- **写入时机**: 在Toolkit的每个`@tool`方法中，数据获取成功后立即写入raw表，返回`data_id`
+- **关联机制**: `AgentState`中新增`data_ids: dict[str, list[int]]`字段，各Analyst节点将data_id传递到下游
+- **决策关联**: 在`signal_processing.py`生成最终决策时，将所有`data_ids`批量写入`decision_data_links`
+- **查询能力**: 支持"给定decision_id，查看所有原始数据"的审计查询
+- **存储优化**: 大文本(news content, research report)使用SQLite TEXT类型；JSON数据使用JSON类型便于查询
 
 ### 9.2 渐进式升级路径
 
@@ -761,60 +790,26 @@ flowchart LR
 
 ## 十、可观测性方案
 
-### 10.1 Langfuse集成架构
+> D2架构图: [`docs/arch/04-observability.d2`](../../docs/arch/04-observability.d2)
 
-```d2
-direction: right
+### 10.1 Langfuse集成要点
 
-App: TradingAgents {
-  style.fill: "#e3f2fd"
-  style.stroke: "#1565c0"
+| 能力 | 描述 | 优先级 |
+|------|------|--------|
+| **Tracing** | 全链路追踪：输入/输出/延迟/Token数/模型名称/成本/错误 | P0 |
+| **Prompt Management** | 版本控制 + A/B测试 + 性能对比 | P1 |
+| **Cost Tracking** | 每节点Token消耗，按profile统计成本 | P0 |
+| **Evaluation** | 决策质量评分，与实际收益对比 | P1 |
 
-  LG: LangGraph
-  Analyst: Analyst节点
-  Research: Research节点
-  Expert: Expert节点
-  Risk: Risk节点
-  CB: |md
-    CallbackHandler()
-    自动注入到所有节点
-  |
-}
+### 10.2 安全性与幻觉控制
 
-LF: Langfuse (自托管) {
-  style.fill: "#e8f5e9"
-  style.stroke: "#388e3c"
+| 安全风险 | 描述 | 优先级 |
+|----------|------|--------|
+| **Prompt注入** | 恶意新闻内容可能操纵Agent决策 | P0 |
+| **数据幻觉** | LLM可能编造不存在的财务数据 | P0 |
+| **决策极化** | Bull/Bear辩论可能陷入极端立场 | P1 |
 
-  Traces: Traces {
-    style.fill: "#fff8e1"
-    style.stroke: "#f9a825"
-    T1: 输入/输出/延迟/Token数
-    T2: 模型名称/成本
-    T3: 错误日志
-  }
-
-  PM: Prompt Management {
-    style.fill: "#f3e5f5"
-    style.stroke: "#7b1fa2"
-    P1: 版本控制
-    P2: A/B测试
-    P3: 性能对比
-  }
-
-  Dashboard: Dashboard {
-    style.fill: "#fce4ec"
-    style.stroke: "#c62828"
-    D1: 成本趋势
-    D2: Token消耗分布
-    D3: 决策质量评分
-  }
-}
-
-App.Analyst -> LF.Traces: trace
-App.Research -> LF.Traces: trace
-App.Expert -> LF.Traces: trace
-App.Risk -> LF.Traces: trace
-```
+**升级建议**: 定量输出强制引用数据源 + 第二个LLM交叉验证 + 硬性约束边界
 
 ---
 
@@ -872,6 +867,22 @@ App.Risk -> LF.Traces: trace
 
 ---
 
+## 十三、关键成功指标（KPIs）
+
+### 性能指标
+- **夏普比率**: 从基线（0.5-0.8）提升到1.5+
+- **最大回撤**: 控制在15%以内
+- **胜率**: 提升到55%+
+- **Alpha（相对SPY）**: 年化超额收益 >5%
+
+### 工程指标
+- **决策延迟**: 从10分钟降低到 <3分钟
+- **成本**: 每次决策成本从$2-5降低到 <$1
+- **可用性**: 系统正常运行时间 >99.5%
+- **测试覆盖率**: 核心代码覆盖率 >70%
+
+---
+
 ## 关键改造文件
 
 | 文件 | 改造内容 | 优先级 |
@@ -890,6 +901,19 @@ App.Risk -> LF.Traces: trace
 
 ---
 
+## D2 图文件清单
+
+按 `arch_docs_standard.md` 规则，以下D2图存放于 `docs/arch/` 目录：
+
+| 文件路径 | 内容描述 |
+|----------|---------|
+| `docs/arch/01-current-architecture.d2` | 当前TradingAgents架构 (As-Is) |
+| `docs/arch/02-target-architecture.d2` | 升级后目标架构 (To-Be) |
+| `docs/arch/03-expert-registry.d2` | 专家智能体注册与发现架构 |
+| `docs/arch/04-observability.d2` | Langfuse可观测性集成架构 |
+
+---
+
 ## 验证方案
 
 - **LLM网关**: 验证各平台模型通过LiteLLM正常响应
@@ -899,6 +923,8 @@ App.Risk -> LF.Traces: trace
 - **辩论机制**: 验证收敛检测在不同场景下的表现
 - **端到端**: 对AAPL执行完整分析流程，检查各环节输出
 - **成本追踪**: 在Langfuse中验证Token消耗统计
+- **Prompt改进验证**: 对比改进前后的决策准确率和Sharpe Ratio
+- **记忆系统验证**: 验证持久化后重启不丢失，检索相关性评分
 
 ---
 
