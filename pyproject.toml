@@ -19,6 +19,7 @@ dependencies = [
     "langgraph>=0.4.8",
     "pandas>=2.3.0",
     "parsel>=1.10.0",
+    "pyyaml>=6.0",
     "pytz>=2025.2",
     "questionary>=2.1.0",
     "rank-bm25>=0.2.2",
@@ -32,6 +33,10 @@ dependencies = [
     "typing-extensions>=4.14.0",
     "yfinance>=0.2.63",
 ]
+
+[project.optional-dependencies]
+observability = ["langfuse>=2.0"]
+litellm = ["litellm>=1.0"]
 
 [project.scripts]
 tradingagents = "cli.main:app"

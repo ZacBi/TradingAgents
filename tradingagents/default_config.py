@@ -31,4 +31,18 @@ DEFAULT_CONFIG = {
     "tool_vendors": {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
     },
+    # ----- Phase 1: Model routing -----
+    # When enabled, per-role model selection from model_routing.yaml is used
+    # instead of the global deep_think_llm / quick_think_llm pair.
+    "model_routing_enabled": False,
+    "model_routing_config": None,       # Path to model_routing.yaml (auto-detected if None)
+    "model_routing_profile": None,      # Override active_profile from YAML
+    # ----- Phase 1: Observability (Langfuse) -----
+    "langfuse_enabled": False,
+    "langfuse_public_key": None,        # or set LANGFUSE_PUBLIC_KEY env var
+    "langfuse_secret_key": None,        # or set LANGFUSE_SECRET_KEY env var
+    "langfuse_host": "http://localhost:3000",
+    # ----- Phase 1: Database (SQLite) -----
+    "database_enabled": False,
+    "database_path": "tradingagents.db",
 }

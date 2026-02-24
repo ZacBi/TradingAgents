@@ -1,6 +1,7 @@
 # TradingAgents/graph/trading_graph.py
 
 import os
+import logging
 from pathlib import Path
 import json
 from datetime import date
@@ -39,6 +40,8 @@ from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
 
+logger = logging.getLogger(__name__)
+
 
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
@@ -71,6 +74,14 @@ class TradingAgentsGraph:
             exist_ok=True,
         )
 
+        # --- Phase 1: Langfuse observability ---
+        self._init_langfuse()
+
+        # --- Phase 1: Model routing ---
+        self._model_routing = None
+        if self.config.get("model_routing_enabled"):
+            self._init_model_routing()
+
         # Initialize LLMs with provider-specific thinking configuration
         llm_kwargs = self._get_provider_kwargs()
 
@@ -78,21 +89,26 @@ class TradingAgentsGraph:
         if self.callbacks:
             llm_kwargs["callbacks"] = self.callbacks
 
-        deep_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["deep_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-        quick_client = create_llm_client(
-            provider=self.config["llm_provider"],
-            model=self.config["quick_think_llm"],
-            base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        )
-
-        self.deep_thinking_llm = deep_client.get_llm()
-        self.quick_thinking_llm = quick_client.get_llm()
+        if self._model_routing:
+            # Per-role model creation via model routing
+            self.deep_thinking_llm = self._create_routed_llm("judge", llm_kwargs)
+            self.quick_thinking_llm = self._create_routed_llm("data_analyst", llm_kwargs)
+        else:
+            # Legacy: global 2-layer model
+            deep_client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config["deep_think_llm"],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
+            quick_client = create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config["quick_think_llm"],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
+            self.deep_thinking_llm = deep_client.get_llm()
+            self.quick_thinking_llm = quick_client.get_llm()
         
         # Initialize memories
         self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
@@ -127,8 +143,76 @@ class TradingAgentsGraph:
         self.ticker = None
         self.log_states_dict = {}  # date to full state dict
 
+        # --- Phase 1: Database ---
+        self.db = None
+        if self.config.get("database_enabled"):
+            self._init_database()
+
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
+
+    # ------------------------------------------------------------------
+    # Phase 1 initializers
+    # ------------------------------------------------------------------
+
+    def _init_langfuse(self):
+        """Auto-initialize Langfuse callback if configured."""
+        if not self.config.get("langfuse_enabled"):
+            return
+        try:
+            from tradingagents.observability import create_langfuse_handler
+            handler = create_langfuse_handler(self.config)
+            if handler:
+                self.callbacks.append(handler)
+                logger.info("Langfuse callback handler attached.")
+        except Exception as exc:
+            logger.warning("Failed to init Langfuse: %s", exc)
+
+    def _init_model_routing(self):
+        """Load model routing config from YAML."""
+        try:
+            from tradingagents.config import load_model_routing
+            self._model_routing = load_model_routing(
+                config_path=self.config.get("model_routing_config"),
+                active_profile=self.config.get("model_routing_profile"),
+            )
+            logger.info(
+                "Model routing enabled — profile: %s",
+                self._model_routing.active_profile,
+            )
+        except Exception as exc:
+            logger.warning("Model routing init failed, falling back to legacy: %s", exc)
+            self._model_routing = None
+
+    def _init_database(self):
+        """Initialize the SQLite database manager."""
+        try:
+            from tradingagents.database import DatabaseManager
+            db_path = self.config.get("database_path", "tradingagents.db")
+            self.db = DatabaseManager(db_path)
+            logger.info("Database initialized at %s", db_path)
+        except Exception as exc:
+            logger.warning("Database init failed: %s", exc)
+            self.db = None
+
+    def _create_routed_llm(self, role_type: str, llm_kwargs: dict):
+        """Create an LLM instance via model routing config."""
+        model_name = self._model_routing.get_model(role_type)
+        provider = self.config.get("llm_provider", "openai")
+        # When model routing is active with litellm, use litellm provider
+        if self.config.get("llm_provider") == "litellm":
+            provider = "litellm"
+        client = create_llm_client(
+            provider=provider,
+            model=model_name,
+            base_url=self.config.get("backend_url"),
+            **llm_kwargs,
+        )
+        return client.get_llm()
+
+    # ------------------------------------------------------------------
+    # Existing methods (unchanged logic)
+    # ------------------------------------------------------------------
 
     def _get_provider_kwargs(self) -> Dict[str, Any]:
         """Get provider-specific kwargs for LLM client creation."""
@@ -215,8 +299,32 @@ class TradingAgentsGraph:
         # Log state
         self._log_state(trade_date, final_state)
 
+        signal = self.process_signal(final_state["final_trade_decision"])
+
+        # --- Phase 1: Persist decision to database ---
+        if self.db:
+            self._persist_decision(final_state, signal)
+
         # Return decision and processed signal
-        return final_state, self.process_signal(final_state["final_trade_decision"])
+        return final_state, signal
+
+    def _persist_decision(self, final_state: dict, signal: str):
+        """Save the decision and related data to the database."""
+        try:
+            decision_id = self.db.save_decision({
+                "ticker": final_state.get("company_of_interest", self.ticker),
+                "trade_date": final_state.get("trade_date", ""),
+                "final_decision": signal,
+                "market_report": final_state.get("market_report", ""),
+                "sentiment_report": final_state.get("sentiment_report", ""),
+                "news_report": final_state.get("news_report", ""),
+                "fundamentals_report": final_state.get("fundamentals_report", ""),
+                "debate_history": final_state.get("investment_debate_state", {}).get("history", ""),
+                "risk_assessment": final_state.get("risk_debate_state", {}).get("history", ""),
+            })
+            logger.info("Decision persisted: id=%d signal=%s", decision_id, signal)
+        except Exception as exc:
+            logger.warning("Failed to persist decision: %s", exc)
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
