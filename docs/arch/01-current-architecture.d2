@@ -7,12 +7,10 @@ title: 当前 TradingAgents 架构 {
   style.bold: true
 }
 
-DataLayer: 数据层 (硬编码，无统一接口) {
+DataLayer: 数据层 (route_to_vendor路由, 支持fallback) {
   style.fill: "#fff3e0"
-  YF: YFinance
-  FH: Finnhub
-  RD: Reddit
-  GN: Google News
+  YF: YFinance (默认)
+  AV: Alpha Vantage (备用)
 }
 
 AnalystLayer: 分析师层 (串行，固定4个，相同LLM) {
@@ -52,7 +50,7 @@ ExecLayer: 执行层 (固定轮次) {
 
 Infra: 基础设施层 {
   style.fill: "#f3e5f5"
-  ChromaDB: ChromaDB (简单向量存储)
+  BM25: BM25 (内存词法检索, rank_bm25)
   LLM: |md
     LLM: 仅2层 quick_think / deep_think
     所有同层Agent共享同一模型

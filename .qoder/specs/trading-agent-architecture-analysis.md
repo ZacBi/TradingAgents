@@ -3,8 +3,8 @@
 ## 项目概览
 
 **项目**: TradingAgents - 多智能体LLM金融交易框架
-**核心架构**: LangGraph编排 + 10个专业Agent + ChromaDB记忆
-**数据源**: YFinance, Finnhub, Reddit, Google News, SimFin
+**核心架构**: LangGraph编排 + 12个专业Agent + BM25记忆
+**数据源**: YFinance, Alpha Vantage
 **LLM支持**: OpenAI, Anthropic, Google Gemini, Ollama, OpenRouter
 
 ### 技术栈
@@ -13,28 +13,27 @@
 |------|---------|---------|
 | **工作流编排** | LangGraph StateGraph | >= 0.4.8 |
 | **LLM 框架** | LangChain (openai/anthropic/google-genai) | 多版本 |
-| **向量存储** | ChromaDB (内存模式) | - |
-| **嵌入模型** | OpenAI `text-embedding-3-small` / Ollama `nomic-embed-text` | - |
+| **记忆检索** | BM25 (rank_bm25, 内存模式) | - |
 | **回测** | Backtrader (仅依赖，未集成) | - |
-| **数据源** | Yahoo Finance, Finnhub, Reddit/PRAW, Google News, SimFin, AKShare, Tushare | - |
-| **UI** | Chainlit Web UI + Rich CLI | - |
+| **数据源** | Yahoo Finance, Alpha Vantage | - |
+| **UI** | Rich CLI (Typer + Rich + Questionary) | - |
 
 ### 核心模块与文件
 
 | 模块 | 关键文件 | 职责 |
 |------|---------|------|
-| **图编排** | `tradingagents/graph/trading_graph.py` (255行) | 主Orchestrator，初始化LLM/记忆/工具/图 |
-| **图设置** | `tradingagents/graph/setup.py` (205行) | 构建LangGraph StateGraph，定义节点和边 |
-| **条件逻辑** | `tradingagents/graph/conditional_logic.py` | 控制辩论轮次、工具调用循环 |
+| **图编排** | `tradingagents/graph/trading_graph.py` (283行) | 主Orchestrator，初始化LLM/记忆/工具/图 |
+| **图设置** | `tradingagents/graph/setup.py` (202行) | 构建LangGraph StateGraph，定义节点和边 |
+| **条件逻辑** | `tradingagents/graph/conditional_logic.py` (67行) | 控制辩论轮次、工具调用循环 |
 | **信号处理** | `tradingagents/graph/signal_processing.py` | 从详细报告提取BUY/SELL/HOLD |
-| **反思学习** | `tradingagents/graph/reflection.py` (122行) | 基于实际收益进行事后反思 |
+| **反思学习** | `tradingagents/graph/reflection.py` (121行) | 基于实际收益进行事后反思 |
 | **分析师** | `tradingagents/agents/analysts/*.py` (4个) | Market / Social / News / Fundamentals |
 | **研究员** | `tradingagents/agents/researchers/*.py` (2个) | Bull / Bear Researcher |
 | **风险管理** | `tradingagents/agents/risk_mgmt/*.py` (3个) | Aggressive / Conservative / Neutral |
 | **管理层** | `tradingagents/agents/managers/*.py` (2个) | Research Manager / Risk Manager |
 | **交易员** | `tradingagents/agents/trader/trader.py` | 生成交易提案 |
-| **记忆系统** | `tradingagents/agents/utils/memory.py` (114行) | ChromaDB + Embedding向量记忆 |
-| **工具箱** | `tradingagents/agents/utils/agent_utils.py` (419行) | Toolkit类，19+ 个@tool方法 |
+| **记忆系统** | `tradingagents/agents/utils/memory.py` (144行) | BM25词法相似度记忆 |
+| **工具箱** | `tradingagents/agents/utils/agent_utils.py` (37行) + `*_tools.py` (4个文件) | 聚合层 + 9个@tool方法分布于独立工具模块 |
 | **配置** | `tradingagents/default_config.py` | 全局配置（LLM/辩论轮数/工具模式） |
 
 ### 完整执行流程
@@ -100,9 +99,9 @@ END
 
 | 问题点 | 描述 | 优先级 |
 |--------|------|--------|
-| **简单向量检索** | 仅使用余弦相似度，无时间衰减、重要性加权 | P1 |
+| **简单词法检索** | 仅使用BM25词频匹配，无语义理解、无时间衰减、无重要性加权 | P1 |
 | **无分层记忆** | 混合短期交易记忆与长期市场规律 | P1 |
-| **非持久化** | `chromadb.Client()` 纯内存模式，重启即丢失 | P0 |
+| **非持久化** | 内存列表存储(`self.documents`)，重启即丢失 | P0 |
 | **记忆隔离** | 5个Agent记忆完全隔离，无跨Agent知识共享 | P1 |
 
 ---
@@ -118,7 +117,7 @@ END
 | 新Agent | 替换现有? | 集成方式 | 代码层面原因 |
 |---------|----------|---------|-------------|
 | **Expert Team**<br>(Buffett/Munger/Lynch等) | **否** | 新增"价值队伍"并行节点 | `InvestDebateState` 硬编码 `bull_history`/`bear_history` 二元结构；<br>`should_continue_debate()` 硬编码 Bull↔Bear 路由；<br>Expert做独立评估 ≠ 对抗性辩论 |
-| **Deep Research** | **否** | 新增POST-STAGE节点 | 4个Analyst各有专项工具链（YFin/Reddit/Finnhub/SimFin），功能互补非重叠；<br>Deep Research做综合交叉验证，可引用4份报告增强深度 |
+| **Deep Research** | **否** | 新增POST-STAGE节点 | 4个Analyst各有专项工具链（YFinance/Alpha Vantage），功能互补非重叠；<br>Deep Research做综合交叉验证，可引用4份报告增强深度 |
 
 ### 2.2 升级后工作流
 
