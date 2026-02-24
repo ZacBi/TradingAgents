@@ -1,6 +1,6 @@
 ---
-trigger: model_decision
-description: 核心架构设计原则，包括开源选型优先序与设计沟通规范
+trigger: always_on
+alwaysApply: true
 ---
 
 # Architecture Design Principles
@@ -21,3 +21,7 @@ description: 核心架构设计原则，包括开源选型优先序与设计沟�
 ## 2. 协作冲突处理
 
 - 若用户需求与现有技术栈冲突，应主动询问并提示潜在风险，而非直接覆盖配置。
+
+## 3. 注重整体
+
+- 架构设计中，尽量减少细节的代码实现

@@ -1,6 +1,6 @@
 ---
-description: 架构文档撰写、可视化绘图标准及目录规范
-globs: docs/arch/**/*.md, docs/arch/**/*.d2, docs/arch/**/*.mermaid
+trigger: always_on
+alwaysApply: true
 ---
 
 # Documentation & Visualization Standards
@@ -18,6 +18,7 @@ globs: docs/arch/**/*.md, docs/arch/**/*.d2, docs/arch/**/*.mermaid
 ## 2. 绘图技术栈
 
 - **推荐工具**：优先使用 **D2** (Modern & Layout-aware) 或 **Mermaid**。
+- **作图要求**：对使用 D2 还是 mermaid需要做出一定的判断，如果是D2必须另外创建文件并进行引用， 如果是Mermaid，可以直接使用代码块
 - **强制要求**：
   - **系统架构图**：必须展示组件拓扑与数据流向。
   - **业务流程图**：必须包含清晰的开始/结束节点与判断分支。
