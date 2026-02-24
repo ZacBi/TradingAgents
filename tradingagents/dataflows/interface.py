@@ -11,6 +11,11 @@ from .y_finance import (
     get_insider_transactions as get_yfinance_insider_transactions,
 )
 from .yfinance_news import get_news_yfinance, get_global_news_yfinance
+from .yfinance_enhanced import (
+    get_earnings_dates as get_yfinance_earnings_dates,
+    get_valuation_metrics as get_yfinance_valuation_metrics,
+    get_institutional_holders as get_yfinance_institutional_holders,
+)
 from .alpha_vantage import (
     get_stock as get_alpha_vantage_stock,
     get_indicator as get_alpha_vantage_indicator,
@@ -23,6 +28,36 @@ from .alpha_vantage import (
     get_global_news as get_alpha_vantage_global_news,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+
+# Optional: FRED macroeconomic data (requires fredapi)
+try:
+    from .fred import (
+        get_cpi as get_fred_cpi,
+        get_gdp as get_fred_gdp,
+        get_interest_rate as get_fred_interest_rate,
+        get_unemployment_rate as get_fred_unemployment_rate,
+        get_m2_money_supply as get_fred_m2_money_supply,
+    )
+    FRED_AVAILABLE = True
+except ImportError:
+    FRED_AVAILABLE = False
+    get_fred_cpi = None
+    get_fred_gdp = None
+    get_fred_interest_rate = None
+    get_fred_unemployment_rate = None
+    get_fred_m2_money_supply = None
+
+# Optional: Longport real-time data (requires longport)
+try:
+    from .longport_api import (
+        get_longport_quote,
+        get_longport_kline,
+    )
+    LONGPORT_AVAILABLE = True
+except ImportError:
+    LONGPORT_AVAILABLE = False
+    get_longport_quote = None
+    get_longport_kline = None
 
 # Configuration and routing logic
 from .config import get_config
@@ -57,12 +92,39 @@ TOOLS_CATEGORIES = {
             "get_global_news",
             "get_insider_transactions",
         ]
-    }
+    },
+    "valuation_data": {
+        "description": "Earnings dates, valuation metrics, institutional holdings",
+        "tools": [
+            "get_earnings_dates",
+            "get_valuation_metrics",
+            "get_institutional_holders",
+        ]
+    },
+    "macro_data": {
+        "description": "Macroeconomic indicators (CPI, GDP, interest rates, etc.)",
+        "tools": [
+            "get_cpi_data",
+            "get_gdp_data",
+            "get_interest_rate_data",
+            "get_unemployment_data",
+            "get_m2_data",
+        ]
+    },
+    "realtime_data": {
+        "description": "Real-time quotes and K-line data (US/HK/CN markets)",
+        "tools": [
+            "get_realtime_quote",
+            "get_kline_data",
+        ]
+    },
 }
 
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "fred",
+    "longport",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -107,6 +169,39 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
     },
+    # valuation_data
+    "get_earnings_dates": {
+        "yfinance": get_yfinance_earnings_dates,
+    },
+    "get_valuation_metrics": {
+        "yfinance": get_yfinance_valuation_metrics,
+    },
+    "get_institutional_holders": {
+        "yfinance": get_yfinance_institutional_holders,
+    },
+    # macro_data (FRED)
+    "get_cpi_data": {
+        "fred": get_fred_cpi,
+    } if FRED_AVAILABLE else {},
+    "get_gdp_data": {
+        "fred": get_fred_gdp,
+    } if FRED_AVAILABLE else {},
+    "get_interest_rate_data": {
+        "fred": get_fred_interest_rate,
+    } if FRED_AVAILABLE else {},
+    "get_unemployment_data": {
+        "fred": get_fred_unemployment_rate,
+    } if FRED_AVAILABLE else {},
+    "get_m2_data": {
+        "fred": get_fred_m2_money_supply,
+    } if FRED_AVAILABLE else {},
+    # realtime_data (Longport)
+    "get_realtime_quote": {
+        "longport": get_longport_quote,
+    } if LONGPORT_AVAILABLE else {},
+    "get_kline_data": {
+        "longport": get_longport_kline,
+    } if LONGPORT_AVAILABLE else {},
 }
 
 def get_category_for_method(method: str) -> str:

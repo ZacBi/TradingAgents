@@ -841,9 +841,9 @@ flowchart LR
 - [x] 重构 `trading_graph.py` 支持模型路由
 
 ### 阶段2: 数据源升级
-- [ ] Yahoo Finance增强（财报日期、估值指标、机构持仓）
-- [ ] 长桥Longport API集成
-- [ ] FRED宏观经济数据接入
+- [x] Yahoo Finance增强（财报日期、估值指标、机构持仓）
+- [x] 长桥Longport API集成
+- [x] FRED宏观经济数据接入
 
 ### 阶段3: Agent升级
 - [ ] 可扩展专家框架（注册机制 + 动态选择器）

@@ -31,7 +31,17 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_news,
     get_insider_transactions,
-    get_global_news
+    get_global_news,
+    get_earnings_dates,
+    get_valuation_metrics,
+    get_institutional_holders,
+    get_cpi_data,
+    get_gdp_data,
+    get_interest_rate_data,
+    get_unemployment_data,
+    get_m2_data,
+    get_realtime_quote,
+    get_kline_data,
 )
 
 from .conditional_logic import ConditionalLogic
@@ -271,6 +281,9 @@ class TradingAgentsGraph:
                     get_stock_data,
                     # Technical indicators
                     get_indicators,
+                    # Real-time data tools (Phase 2)
+                    get_realtime_quote,
+                    get_kline_data,
                 ]
             ),
             "social": ToolNode(
@@ -285,6 +298,12 @@ class TradingAgentsGraph:
                     get_news,
                     get_global_news,
                     get_insider_transactions,
+                    # Macroeconomic data tools (Phase 2)
+                    get_cpi_data,
+                    get_gdp_data,
+                    get_interest_rate_data,
+                    get_unemployment_data,
+                    get_m2_data,
                 ]
             ),
             "fundamentals": ToolNode(
@@ -294,6 +313,10 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
+                    # Valuation data tools (Phase 2)
+                    get_earnings_dates,
+                    get_valuation_metrics,
+                    get_institutional_holders,
                 ]
             ),
         }

@@ -18,6 +18,22 @@ from tradingagents.agents.utils.news_data_tools import (
     get_insider_transactions,
     get_global_news
 )
+from tradingagents.agents.utils.valuation_data_tools import (
+    get_earnings_dates,
+    get_valuation_metrics,
+    get_institutional_holders,
+)
+from tradingagents.agents.utils.macro_data_tools import (
+    get_cpi_data,
+    get_gdp_data,
+    get_interest_rate_data,
+    get_unemployment_data,
+    get_m2_data,
+)
+from tradingagents.agents.utils.realtime_data_tools import (
+    get_realtime_quote,
+    get_kline_data,
+)
 
 def create_msg_delete():
     def delete_messages(state):

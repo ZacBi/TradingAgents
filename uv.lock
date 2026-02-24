@@ -1652,6 +1652,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7e/c1/7bd34ad0ae6cfd99512f8a40b28b9624c3b1f4e1d40c9038eabc2f870b15/literalai-0.1.201.tar.gz", hash = "sha256:29e4ccadd9d68bfea319a7f0b4fc32611b081990d9195f98e5e97a14d24d3713", size = 67832, upload-time = "2025-03-24T10:01:51.559Z" }
 
 [[package]]
+name = "longport"
+version = "3.0.22"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/e0/543c3b0eb5bef85eb6f31fdf19d1783e56880a66db1886fca55db0c0dcfa/longport-3.0.22-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:2d5ed509ce1db6c5d7ef285a5e3e72688378d6d13009788f9f34334a431c9592", size = 4845331, upload-time = "2026-02-05T11:24:36.148Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/3b/3308dc8024da3fddf6465f0ee5d49d95540cb612e3c659a3bb5220c93c2b/longport-3.0.22-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:8057a3d36c2daf09b3e7ec3ac599b4039393cf191c9413c1e8f4c3c4921b3c36", size = 4692089, upload-time = "2026-02-05T11:24:37.781Z" },
+    { url = "https://files.pythonhosted.org/packages/72/d8/2f55108a1fbf038e78121afe4b19409ec5760a6ac1d23740be0a2bda407a/longport-3.0.22-cp313-cp313-manylinux_2_39_aarch64.whl", hash = "sha256:483cf89fdc329040871aebb961433a6f215b50ff75b16da9dfbd9e0a019aa674", size = 4924094, upload-time = "2026-02-05T11:24:39.207Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/77/343d0940233d52072c74f4e531999975102c32d5a2e78a225b54569ff96c/longport-3.0.22-cp313-cp313-manylinux_2_39_x86_64.whl", hash = "sha256:9ee75db7a3f37147adbb275439c59d0f526da975d73f28000c752b15b0b3b9dc", size = 4936236, upload-time = "2026-02-05T11:24:40.712Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/73/c82f225978ab4faf631f22b46ad88a6968b15360c9f50b42d5e7e9f19b21/longport-3.0.22-cp313-cp313-win_amd64.whl", hash = "sha256:29a266997f8efcd67060e58036d964ecf1822675c30b793b10b4f95d17cb0472", size = 4931335, upload-time = "2026-02-05T11:24:43.777Z" },
+    { url = "https://files.pythonhosted.org/packages/71/6e/6fd10816b052e67b05e398e2d65b31d87a50236aec93dbb7c94818bddf20/longport-3.0.22-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:5317d182436b3787dd24ffd2fe8dd7906a96ef49eeb2ed5f42dc93fbb39f6c9d", size = 4837631, upload-time = "2026-02-05T11:24:45.465Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/0e/e986f63a34f1cf2e2bc8b329176461493a801d78b1c8c78a56a6bdfbb7cb/longport-3.0.22-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:3dcf05a8760f56f26aefe9c32f18bffeb3142ec9c3483d21119f8ebfc8bf637d", size = 4696893, upload-time = "2026-02-05T11:24:46.909Z" },
+    { url = "https://files.pythonhosted.org/packages/25/28/72150af971a7e955bba20f1f0df36843709451192be1b2d41105c1889f3c/longport-3.0.22-cp314-cp314-manylinux_2_39_aarch64.whl", hash = "sha256:aafcaa8e00d04d1afdc4106f57a4321a366cac28adf3a51e6e5da8f4d7612614", size = 4932539, upload-time = "2026-02-05T11:24:48.827Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/3f/8a3d11c2d08553fdcaf100180b746d5c8f334ac454442167631993adbb30/longport-3.0.22-cp314-cp314-manylinux_2_39_x86_64.whl", hash = "sha256:c25e5304d8455806450f686614b714b605310d52f485992efe81f38c223de945", size = 4955902, upload-time = "2026-02-05T11:24:50.337Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/99/f23f467e1ed507ceb4d3a9157d6dcbf4ea952b4c76feafdac6ba73e98a7d/longport-3.0.22-cp314-cp314-win_amd64.whl", hash = "sha256:aaaf29551a0e99725327b191a25be4dd815c844458b6778cf13325002921abd9", size = 4941102, upload-time = "2026-02-05T11:24:51.759Z" },
+]
+
+[[package]]
 name = "lxml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4304,6 +4321,7 @@ dashboard = [
 data-sources = [
     { name = "finnhub-python" },
     { name = "fredapi" },
+    { name = "longport" },
     { name = "praw" },
 ]
 dev = [
@@ -4340,6 +4358,7 @@ requires-dist = [
     { name = "langfuse", marker = "extra == 'observability'", specifier = ">=2.0" },
     { name = "langgraph", specifier = ">=1.0.0" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.0" },
+    { name = "longport", marker = "extra == 'data-sources'", specifier = ">=1.0.0" },
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "parsel", specifier = ">=1.10.0" },
     { name = "praw", marker = "extra == 'data-sources'", specifier = ">=7.7.0" },

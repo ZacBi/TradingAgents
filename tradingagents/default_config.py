@@ -26,6 +26,9 @@ DEFAULT_CONFIG = {
         "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
         "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
         "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "valuation_data": "yfinance",        # Options: yfinance
+        "macro_data": "fred",                # Options: fred
+        "realtime_data": "longport",         # Options: longport
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
@@ -49,4 +52,9 @@ DEFAULT_CONFIG = {
     "checkpointing_enabled": True,
     "checkpoint_storage": "memory",        # memory | sqlite (sqlite requires langgraph-checkpoint-sqlite)
     "checkpoint_db_path": "checkpoints.db",
+    # ----- Phase 2: Data Source API Keys -----
+    "fred_api_key": None,                  # or set FRED_API_KEY env var
+    "longport_app_key": None,              # or set LONGPORT_APP_KEY env var
+    "longport_app_secret": None,           # or set LONGPORT_APP_SECRET env var
+    "longport_access_token": None,         # or set LONGPORT_ACCESS_TOKEN env var
 }
