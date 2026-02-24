@@ -10,43 +10,78 @@
 
 ## 一、当前架构（As-Is）
 
-```mermaid
-flowchart TD
-    subgraph DataLayer["数据层 (硬编码，无统一接口)"]
-        YF[YFinance] & FH[Finnhub] & RD[Reddit] & GN[Google News]
-    end
+```d2
+direction: down
 
-    subgraph AnalystLayer["分析师层 (串行，固定4个，相同LLM)"]
-        direction LR
-        MA[Market Analyst] --> SA[Social Analyst] --> NA[News Analyst] --> FA[Fundamentals Analyst]
-    end
+title: 当前 TradingAgents 架构 {
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
 
-    subgraph ResearchLayer["研究层 (固定轮次辩论 max_rounds=1)"]
-        Bull[Bull Researcher] <-->|固定2轮| Bear[Bear Researcher]
-        Bull & Bear --> RM[Research Manager]
-    end
+DataLayer: 数据层 (硬编码，无统一接口) {
+  style.fill: "#fff3e0"
+  YF: YFinance
+  FH: Finnhub
+  RD: Reddit
+  GN: Google News
+}
 
-    subgraph ExecLayer["执行层 (固定轮次)"]
-        Trader --> Risky & Safe & Neutral
-        Risky & Safe & Neutral --> RiskMgr[Risk Manager]
-        RiskMgr --> Output[/"BUY / SELL / HOLD"/]
-    end
+AnalystLayer: 分析师层 (串行，固定4个，相同LLM) {
+  style.fill: "#fff8e1"
+  direction: right
+  MA: Market Analyst -> SA: Social Analyst -> NA: News Analyst -> FA: Fundamentals
+}
 
-    subgraph Infra["基础设施层"]
-        ChromaDB["ChromaDB (简单向量存储)"]
-        LLM["LLM: 仅2层 quick_think / deep_think\n所有同层Agent共享同一模型"]
-    end
+ResearchLayer: 研究层 (固定轮次辩论 max_rounds=1) {
+  style.fill: "#e8f5e9"
+  Bull: Bull Researcher
+  Bear: Bear Researcher
+  RM: Research Manager
+  Bull <-> Bear: 固定2轮
+  Bull -> RM
+  Bear -> RM
+}
 
-    DataLayer --> AnalystLayer --> ResearchLayer --> ExecLayer
+ExecLayer: 执行层 (固定轮次) {
+  style.fill: "#e3f2fd"
+  Trader
+  Risky
+  Safe
+  Neutral
+  RiskMgr: Risk Manager
+  Output: BUY / SELL / HOLD {
+    shape: parallelogram
+  }
+  Trader -> Risky
+  Trader -> Safe
+  Trader -> Neutral
+  Risky -> RiskMgr
+  Safe -> RiskMgr
+  Neutral -> RiskMgr
+  RiskMgr -> Output
+}
 
-    Missing["❌ 无持仓管理  ❌ 无可观测性  ❌ 无状态持久化\n❌ 无价值投资  ❌ 无专家系统  ❌ 无财报跟踪"]
+Infra: 基础设施层 {
+  style.fill: "#f3e5f5"
+  ChromaDB: ChromaDB (简单向量存储)
+  LLM: |md
+    LLM: 仅2层 quick_think / deep_think
+    所有同层Agent共享同一模型
+  |
+}
 
-    style Missing fill:#fee,stroke:#f66,color:#c00
-    style DataLayer fill:#fff3e0
-    style AnalystLayer fill:#fff8e1
-    style ResearchLayer fill:#e8f5e9
-    style ExecLayer fill:#e3f2fd
-    style Infra fill:#f3e5f5
+Missing: |md
+  ❌ 无持仓管理  ❌ 无可观测性  ❌ 无状态持久化
+  ❌ 无价值投资  ❌ 无专家系统  ❌ 无财报跟踪
+| {
+  style.fill: "#fee"
+  style.stroke: "#f66"
+  style.font-color: "#c00"
+}
+
+DataLayer -> AnalystLayer -> ResearchLayer -> ExecLayer
 ```
 
 **核心局限**:
@@ -61,100 +96,159 @@ flowchart TD
 
 ## 二、目标架构（To-Be）
 
-```mermaid
-flowchart TD
-    subgraph Observe["可观测层 - Langfuse (自托管)"]
-        Tracing["Tracing: 全链路追踪"]
-        PromptMgmt["Prompt Management: 版本控制 + A/B测试"]
-        CostTrack["Cost Tracking: 每节点Token消耗"]
-        Eval["Evaluation: 决策质量评分"]
-    end
+```d2
+direction: down
 
-    subgraph LLMGateway["LLM网关层 - LiteLLM"]
-        direction LR
-        Google["Google Gemini"]
-        Bailian["百炼 Qwen/DS"]
-        OpenRouter["OpenRouter GPT/Claude"]
-        Ollama["Ollama 本地模型"]
-        Google & Bailian & OpenRouter & Ollama --> UnifiedAPI["统一API接口\n自动fallback / 成本路由 / 负载均衡"]
-    end
+title: 升级后 TradingAgents 架构 {
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
 
-    subgraph DataLayer2["数据层"]
-        direction LR
-        subgraph Free["免费数据源"]
-            YF2["Yahoo Finance (主力)"]
-            FRED["FRED (宏观经济)"]
-            FH2["Finnhub (新闻)"]
-            RD2["Reddit (情绪)"]
-        end
-        subgraph Paid["付费数据源"]
-            Longport["长桥 Longport API\n港/美/A股实时行情+交易"]
-        end
-    end
+Observe: 可观测层 - Langfuse (自托管) {
+  style.fill: "#e8eaf6"
+  style.stroke: "#3f51b5"
+  Tracing: Tracing: 全链路追踪
+  PromptMgmt: Prompt Management: 版本控制 + A/B测试
+  CostTrack: Cost Tracking: 每节点Token消耗
+  Eval: Evaluation: 决策质量评分
+}
 
-    subgraph AgentOrch["Agent编排层 - LangGraph 1.0\n(Checkpointing | Subgraph | Human-in-the-Loop | Streaming)"]
+LLMGateway: LLM网关层 - LiteLLM {
+  style.fill: "#fce4ec"
+  style.stroke: "#e91e63"
+  direction: right
+  Google: Google Gemini
+  Bailian: 百炼 Qwen/DS
+  OpenRouter: OpenRouter GPT/Claude
+  Ollama: Ollama 本地模型
+  UnifiedAPI: |md
+    **统一API接口**
+    自动fallback / 成本路由 / 负载均衡
+  |
+  Google -> UnifiedAPI
+  Bailian -> UnifiedAPI
+  OpenRouter -> UnifiedAPI
+  Ollama -> UnifiedAPI
+}
 
-        subgraph Phase1["阶段1: 数据收集 (并行)"]
-            MA2[Market Analyst] & NA2[News Analyst] & SA2[Social Analyst] & FA2[Fundamentals] --> Reports["4份分析报告"]
-            DeepRes["Deep Research Agent (可选)"] --> DeepReport["深度研究报告"]
-            Earnings["Earnings Tracker (可选)"] --> EarningsAlert["财报预警"]
-        end
+DataLayer: 数据层 {
+  style.fill: "#fff3e0"
+  style.stroke: "#ff9800"
+  Free: 免费数据源 {
+    YF: Yahoo Finance (主力)
+    FRED: FRED (宏观经济)
+    FH: Finnhub (新闻)
+    RD: Reddit (情绪)
+  }
+  Paid: 付费数据源 {
+    style.fill: "#fff8e1"
+    Longport: |md
+      长桥 Longport API
+      港/美/A股实时行情+交易
+    |
+  }
+}
 
-        subgraph Phase2["阶段2: 多视角分析"]
-            subgraph TrendTeam["趋势/投机团队"]
-                Bull2["Bull Researcher"] <-->|动态收敛辩论| Bear2["Bear Researcher"]
-            end
-            subgraph ValueTeam["价值投资团队 (动态选择N个专家)"]
-                Buffett["Buffett Agent"]
-                Munger["Munger Agent"]
-                Lynch["Lynch Agent"]
-                Livermore["Livermore Agent"]
-                MoreExperts["... (可扩展注册)"]
-            end
-            TrendTeam & ValueTeam --> RM2["Research Manager (综合裁决)"]
-        end
+AgentOrch: Agent编排层 - LangGraph 1.0 {
+  style.fill: "#e8f5e9"
+  style.stroke: "#4caf50"
+  
+  Features: |md
+    **特性**: Checkpointing | Subgraph | Human-in-the-Loop | Streaming
+  | {
+    shape: text
+    style.font-size: 12
+  }
 
-        subgraph Phase3["阶段3: 风险评估 + 执行"]
-            Trader2["Trader"] --> RiskTeam["Risk Team (动态收敛辩论)"]
-            RiskTeam --> RiskMgr2["Risk Manager"]
-            RiskMgr2 --> FinalDecision[/"BUY/SELL/HOLD + 仓位 + 止损"/]
-        end
+  Phase1: 阶段1: 数据收集 (并行) {
+    style.fill: "#c8e6c9"
+    MA: Market Analyst
+    NA: News Analyst
+    SA: Social Analyst
+    FA: Fundamentals
+    Reports: 4份分析报告
+    DeepRes: Deep Research Agent (可选)
+    DeepReport: 深度研究报告
+    Earnings: Earnings Tracker (可选)
+    EarningsAlert: 财报预警
+    MA -> Reports
+    NA -> Reports
+    SA -> Reports
+    FA -> Reports
+    DeepRes -> DeepReport
+    Earnings -> EarningsAlert
+  }
 
-        Phase1 --> Phase2 --> Phase3
-    end
+  Phase2: 阶段2: 多视角分析 {
+    style.fill: "#a5d6a7"
+    TrendTeam: 趋势/投机团队 {
+      Bull: Bull Researcher
+      Bear: Bear Researcher
+      Bull <-> Bear: 动态收敛辩论
+    }
+    ValueTeam: 价值投资团队 (动态选择N个专家) {
+      Buffett: Buffett Agent
+      Munger: Munger Agent
+      Lynch: Lynch Agent
+      Livermore: Livermore Agent
+      MoreExperts: ... (可扩展注册)
+    }
+    RM: Research Manager (综合裁决)
+    TrendTeam -> RM
+    ValueTeam -> RM
+  }
 
-    subgraph Persist["持久化层"]
-        subgraph SQLiteDB["SQLite 数据库"]
-            Positions["positions (持仓)"]
-            Trades["trades (交易记录)"]
-            Decisions["agent_decisions (决策日志)"]
-            NAV["daily_nav (净值曲线)"]
-        end
-        subgraph ChromaDBE["ChromaDB (增强)"]
-            Working["工作记忆 (当日)"]
-            Episodic["情节记忆 (历史案例)"]
-            Semantic["语义记忆 (市场规律)"]
-        end
-        Checkpoints["LangGraph Checkpoints\n状态快照，支持回滚/重放"]
-    end
+  Phase3: 阶段3: 风险评估 + 执行 {
+    style.fill: "#81c784"
+    Trader
+    RiskTeam: Risk Team (动态收敛辩论)
+    RiskMgr: Risk Manager
+    FinalDecision: BUY/SELL/HOLD + 仓位 + 止损 {
+      shape: parallelogram
+    }
+    Trader -> RiskTeam -> RiskMgr -> FinalDecision
+  }
 
-    subgraph Display["展示层 (渐进式)"]
-        direction LR
-        CLI["CLI (已有)"] --> Streamlit["Streamlit Dashboard"] --> WebApp["FastAPI + React"]
-    end
+  Phase1 -> Phase2 -> Phase3
+}
 
-    Observe -.->|监控所有Agent节点| AgentOrch
-    UnifiedAPI --> AgentOrch
-    DataLayer2 --> AgentOrch
-    AgentOrch --> Persist
-    Persist --> Display
+Persist: 持久化层 {
+  style.fill: "#f3e5f5"
+  style.stroke: "#9c27b0"
+  SQLiteDB: SQLite 数据库 {
+    Positions: positions (持仓)
+    Trades: trades (交易记录)
+    Decisions: agent_decisions (决策日志)
+    NAV: daily_nav (净值曲线)
+  }
+  ChromaDBE: ChromaDB (增强) {
+    Working: 工作记忆 (当日)
+    Episodic: 情节记忆 (历史案例)
+    Semantic: 语义记忆 (市场规律)
+  }
+  Checkpoints: |md
+    LangGraph Checkpoints
+    状态快照，支持回滚/重放
+  |
+}
 
-    style Observe fill:#e8eaf6,stroke:#3f51b5
-    style LLMGateway fill:#fce4ec,stroke:#e91e63
-    style DataLayer2 fill:#fff3e0,stroke:#ff9800
-    style AgentOrch fill:#e8f5e9,stroke:#4caf50
-    style Persist fill:#f3e5f5,stroke:#9c27b0
-    style Display fill:#e0f7fa,stroke:#00bcd4
+Display: 展示层 (渐进式) {
+  style.fill: "#e0f7fa"
+  style.stroke: "#00bcd4"
+  direction: right
+  CLI: CLI (已有) -> Streamlit: Streamlit Dashboard -> WebApp: FastAPI + React
+}
+
+# 连接关系
+Observe -> AgentOrch: 监控所有Agent节点 {
+  style.stroke-dash: 3
+}
+LLMGateway.UnifiedAPI -> AgentOrch
+DataLayer -> AgentOrch
+AgentOrch -> Persist
+Persist -> Display
 ```
 
 ---
@@ -335,37 +429,62 @@ flowchart TD
 
 ### 4.2 专家注册与发现架构
 
-```mermaid
-flowchart TD
-    subgraph Registry["Expert Agent Registry"]
-        direction TB
-        Profile["ExpertProfile (注册信息)\nname | philosophy | style\nbest_for: sectors, market_cap, volatility\nprompt_template | role_type"]
+```d2
+direction: down
 
-        subgraph Experts["已注册专家池"]
-            Graham["Ben Graham\n深度价值, 烟蒂股"]
-            Buffett["Warren Buffett\n护城河, 长期持有"]
-            Munger["Charlie Munger\n多元思维, 逆向检验"]
-            Lynch["Peter Lynch\n成长价值, PEG"]
-            Livermore["Jesse Livermore\n趋势投机, 关键点"]
-            Greenblatt["Joel Greenblatt\n魔法公式, 量化"]
-            Marks["Howard Marks\n周期投资, 风险意识"]
-            Dalio["Ray Dalio\n全天候, 宏观对冲"]
-            Custom["... 自定义专家\n用户可注册新专家"]
-        end
-    end
+Registry: Expert Agent Registry {
+  style.fill: "#e8f5e9"
+  style.stroke: "#388e3c"
 
-    subgraph Selector["Expert Selector (动态选择器)"]
-        Input["输入:\n股票特征 (行业/市值/波动率/PE)\n市场环境 (牛/熊/震荡)\n用户偏好 (可选)"]
-        Strategy2["选择策略:\n特征匹配 best_for\n多样性保障\n数量控制 2~5个\n用户覆盖"]
-        Output2["输出: 选定的专家Agent列表"]
-        Input --> Strategy2 --> Output2
-    end
+  Profile: ExpertProfile (注册信息) {
+    style.fill: "#fff8e1"
+    style.stroke: "#f9a825"
+    content: |md
+      - name | philosophy | style
+      - best_for: sectors, market_cap, volatility
+      - prompt_template | role_type
+    |
+  }
 
-    Registry --> Selector
+  Experts: 已注册专家池 {
+    style.fill: "#c8e6c9"
+    Graham: Ben Graham\n深度价值, 烟蒂股
+    Buffett: Warren Buffett\n护城河, 长期持有
+    Munger: Charlie Munger\n多元思维, 逆向检验
+    Lynch: Peter Lynch\n成长价值, PEG
+    Livermore: Jesse Livermore\n趋势投机, 关键点
+    Greenblatt: Joel Greenblatt\n魔法公式, 量化
+    Marks: Howard Marks\n周期投资, 风险意识
+    Dalio: Ray Dalio\n全天候, 宏观对冲
+    Custom: ... 自定义专家\n用户可注册新专家
+  }
+}
 
-    style Registry fill:#e8f5e9,stroke:#388e3c
-    style Selector fill:#e3f2fd,stroke:#1565c0
-    style Profile fill:#fff8e1,stroke:#f9a825
+Selector: Expert Selector (动态选择器) {
+  style.fill: "#e3f2fd"
+  style.stroke: "#1565c0"
+
+  Input: |md
+    **输入:**
+    - 股票特征 (行业/市值/波动率/PE)
+    - 市场环境 (牛/熊/震荡)
+    - 用户偏好 (可选)
+  |
+
+  Strategy: |md
+    **选择策略:**
+    - 特征匹配 best_for
+    - 多样性保障
+    - 数量控制 2~5个
+    - 用户覆盖
+  |
+
+  Output: 输出: 选定的专家Agent列表
+
+  Input -> Strategy -> Output
+}
+
+Registry -> Selector
 ```
 
 ### 4.3 动态选择示例
@@ -644,47 +763,57 @@ flowchart LR
 
 ### 10.1 Langfuse集成架构
 
-```mermaid
-flowchart LR
-    subgraph App["TradingAgents"]
-        direction TB
-        LG["LangGraph"]
-        Analyst["Analyst节点"]
-        Research["Research节点"]
-        Expert["Expert节点"]
-        Risk["Risk节点"]
-        CB["CallbackHandler()\n自动注入到所有节点"]
-    end
+```d2
+direction: right
 
-    subgraph LF["Langfuse (自托管)"]
-        direction TB
-        subgraph Traces["Traces"]
-            T1["输入/输出/延迟/Token数"]
-            T2["模型名称/成本"]
-            T3["错误日志"]
-        end
-        subgraph PM["Prompt Management"]
-            P1["版本控制"]
-            P2["A/B测试"]
-            P3["性能对比"]
-        end
-        subgraph Dashboard["Dashboard"]
-            D1["成本趋势"]
-            D2["Token消耗分布"]
-            D3["决策质量评分"]
-        end
-    end
+App: TradingAgents {
+  style.fill: "#e3f2fd"
+  style.stroke: "#1565c0"
 
-    Analyst -->|trace| Traces
-    Research -->|trace| Traces
-    Expert -->|trace| Traces
-    Risk -->|trace| Traces
+  LG: LangGraph
+  Analyst: Analyst节点
+  Research: Research节点
+  Expert: Expert节点
+  Risk: Risk节点
+  CB: |md
+    CallbackHandler()
+    自动注入到所有节点
+  |
+}
 
-    style App fill:#e3f2fd,stroke:#1565c0
-    style LF fill:#e8f5e9,stroke:#388e3c
-    style Traces fill:#fff8e1,stroke:#f9a825
-    style PM fill:#f3e5f5,stroke:#7b1fa2
-    style Dashboard fill:#fce4ec,stroke:#c62828
+LF: Langfuse (自托管) {
+  style.fill: "#e8f5e9"
+  style.stroke: "#388e3c"
+
+  Traces: Traces {
+    style.fill: "#fff8e1"
+    style.stroke: "#f9a825"
+    T1: 输入/输出/延迟/Token数
+    T2: 模型名称/成本
+    T3: 错误日志
+  }
+
+  PM: Prompt Management {
+    style.fill: "#f3e5f5"
+    style.stroke: "#7b1fa2"
+    P1: 版本控制
+    P2: A/B测试
+    P3: 性能对比
+  }
+
+  Dashboard: Dashboard {
+    style.fill: "#fce4ec"
+    style.stroke: "#c62828"
+    D1: 成本趋势
+    D2: Token消耗分布
+    D3: 决策质量评分
+  }
+}
+
+App.Analyst -> LF.Traces: trace
+App.Research -> LF.Traces: trace
+App.Expert -> LF.Traces: trace
+App.Risk -> LF.Traces: trace
 ```
 
 ---

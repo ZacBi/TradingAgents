@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "d2-diagram-creator": {
+      "source": "jeremylongshore/claude-code-plugins-plus-skills",
+      "sourceType": "github",
+      "computedHash": "48a2deeac1a883688fb8d5c708c361e093065735deb3b1861759174e3eb06c03"
+    }
+  }
+}
