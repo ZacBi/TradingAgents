@@ -87,6 +87,11 @@ class TradingAgentsGraph:
         # --- Phase 1: Langfuse observability ---
         self._init_langfuse()
 
+        # --- Prompt Management (Langfuse) ---
+        self.prompt_manager = None
+        if self.config.get("prompt_management_enabled", True):
+            self._init_prompt_manager()
+
         # --- Phase 1: Model routing ---
         self._model_routing = None
         if self.config.get("model_routing_enabled"):
@@ -187,6 +192,19 @@ class TradingAgentsGraph:
                 logger.info("Langfuse callback handler attached.")
         except Exception as exc:
             logger.warning("Failed to init Langfuse: %s", exc)
+
+    def _init_prompt_manager(self):
+        """Initialize the Langfuse prompt manager."""
+        try:
+            from tradingagents.prompts import PromptManager
+            self.prompt_manager = PromptManager(self.config)
+            if self.prompt_manager.is_available():
+                logger.info("Langfuse prompt management enabled.")
+            else:
+                logger.info("Prompt management using local fallback templates.")
+        except Exception as exc:
+            logger.warning("Failed to init PromptManager: %s", exc)
+            self.prompt_manager = None
 
     def _init_model_routing(self):
         """Load model routing config from YAML."""

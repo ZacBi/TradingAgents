@@ -3,13 +3,15 @@
 
 import json
 import logging
-from typing import Callable
+from typing import Callable, Optional
 
 from tradingagents.experts.base import ExpertProfile, ExpertOutput, EXPERT_OUTPUT_SCHEMA
 from tradingagents.experts.registry import register_expert
+from tradingagents.prompts import PromptNames, get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
+# Kept for backward compatibility and ExpertProfile reference
 BUFFETT_PROMPT_TEMPLATE = """You are Warren Buffett, the legendary value investor and CEO of Berkshire Hathaway. 
 You are analyzing a stock to provide investment advice based on your time-tested investment philosophy.
 
@@ -77,17 +79,20 @@ Be decisive but thoughtful. Channel Warren Buffett's wisdom and communicate your
 """
 
 
-def create_buffett_agent(llm, memory) -> Callable:
+def create_buffett_agent(llm, memory, prompt_manager: Optional[object] = None) -> Callable:
     """
     Factory function to create a Warren Buffett expert agent node.
     
     Args:
         llm: Language model instance
         memory: FinancialSituationMemory instance for this expert
+        prompt_manager: Optional PromptManager instance for centralized prompts
         
     Returns:
         A node function for the LangGraph
     """
+    # Use provided prompt_manager or get global instance
+    pm = prompt_manager or get_prompt_manager()
     
     def buffett_node(state: dict) -> dict:
         """Buffett expert node that evaluates the stock."""
@@ -110,14 +115,17 @@ def create_buffett_agent(llm, memory) -> Callable:
         if not past_memories:
             past_memories = "No relevant historical analysis available."
         
-        # Build prompt
-        prompt = BUFFETT_PROMPT_TEMPLATE.format(
-            market_report=market_report,
-            sentiment_report=sentiment_report,
-            news_report=news_report,
-            fundamentals_report=fundamentals_report,
-            past_memories=past_memories,
-            output_schema=json.dumps(EXPERT_OUTPUT_SCHEMA, indent=2),
+        # Build prompt using PromptManager
+        prompt = pm.get_prompt(
+            PromptNames.EXPERT_BUFFETT,
+            variables={
+                "market_report": market_report,
+                "sentiment_report": sentiment_report,
+                "news_report": news_report,
+                "fundamentals_report": fundamentals_report,
+                "past_memories": past_memories,
+                "output_schema": json.dumps(EXPERT_OUTPUT_SCHEMA, indent=2),
+            }
         )
         
         # Get LLM response

@@ -3,10 +3,11 @@
 
 import json
 import logging
-from typing import Callable
+from typing import Callable, Optional
 
 from tradingagents.experts.base import ExpertProfile, ExpertOutput, EXPERT_OUTPUT_SCHEMA
 from tradingagents.experts.registry import register_expert
+from tradingagents.prompts import PromptNames, get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
@@ -87,17 +88,19 @@ Focus on price action, trends, and timing. Be decisive about entry and exit poin
 """
 
 
-def create_livermore_agent(llm, memory) -> Callable:
+def create_livermore_agent(llm, memory, prompt_manager: Optional[object] = None) -> Callable:
     """
     Factory function to create a Jesse Livermore expert agent node.
     
     Args:
         llm: Language model instance
         memory: FinancialSituationMemory instance for this expert
+        prompt_manager: Optional PromptManager instance for centralized prompts
         
     Returns:
         A node function for the LangGraph
     """
+    pm = prompt_manager or get_prompt_manager()
     
     def livermore_node(state: dict) -> dict:
         """Livermore expert node that evaluates the stock from a trading perspective."""
@@ -117,13 +120,16 @@ def create_livermore_agent(llm, memory) -> Callable:
         if not past_memories:
             past_memories = "No relevant historical analysis available."
         
-        prompt = LIVERMORE_PROMPT_TEMPLATE.format(
-            market_report=market_report,
-            sentiment_report=sentiment_report,
-            news_report=news_report,
-            fundamentals_report=fundamentals_report,
-            past_memories=past_memories,
-            output_schema=json.dumps(EXPERT_OUTPUT_SCHEMA, indent=2),
+        prompt = pm.get_prompt(
+            PromptNames.EXPERT_LIVERMORE,
+            variables={
+                "market_report": market_report,
+                "sentiment_report": sentiment_report,
+                "news_report": news_report,
+                "fundamentals_report": fundamentals_report,
+                "past_memories": past_memories,
+                "output_schema": json.dumps(EXPERT_OUTPUT_SCHEMA, indent=2),
+            }
         )
         
         response = llm.invoke(prompt)

@@ -80,5 +80,10 @@ DEFAULT_CONFIG = {
     "earnings_tracking_enabled": True,     # Enable earnings date tracking
     "earnings_lookahead_days": 14,         # Days to look ahead for earnings
     "earnings_imminent_days": 3,           # Days threshold for "imminent" alerts
+    # ----- Prompt Management (Langfuse) -----
+    "prompt_management_enabled": True,     # Enable Langfuse prompt management
+    "prompt_cache_ttl": 300,               # Seconds to cache prompts (0 = disable)
+    "prompt_fallback_enabled": True,       # Use local fallback if Langfuse unavailable
+    "prompt_version": None,                # None = production, or specific version
 }
 
