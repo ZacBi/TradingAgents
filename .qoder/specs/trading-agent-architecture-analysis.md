@@ -846,11 +846,11 @@ flowchart LR
 - [x] FRED宏观经济数据接入
 
 ### 阶段3: Agent升级
-- [ ] 可扩展专家框架（注册机制 + 动态选择器）
-- [ ] 首批专家Agent: Buffett, Munger, Lynch, Livermore, Graham
-- [ ] 动态收敛辩论机制
-- [ ] Deep Research集成（基于open_deep_research）
-- [ ] 财报跟踪Agent
+- [x] 可扩展专家框架（注册机制 + 动态选择器）
+- [x] 首批专家Agent: Buffett, Munger, Lynch, Livermore, Graham
+- [x] 动态收敛辩论机制
+- [x] Deep Research集成（基于open_deep_research）
+- [x] 财报跟踪Agent
 
 ### 阶段4: 价值投资框架
 - [ ] DCF估值模型

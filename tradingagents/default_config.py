@@ -57,4 +57,28 @@ DEFAULT_CONFIG = {
     "longport_app_key": None,              # or set LONGPORT_APP_KEY env var
     "longport_app_secret": None,           # or set LONGPORT_APP_SECRET env var
     "longport_access_token": None,         # or set LONGPORT_ACCESS_TOKEN env var
+    # ----- Phase 3: Expert Framework -----
+    "experts_enabled": True,               # Enable expert agent evaluations
+    "max_experts": 3,                      # Maximum experts to select per analysis
+    "expert_selection_mode": "auto",       # "auto" | "manual" | "random"
+    "selected_experts": None,              # Manual mode: ["buffett", "munger", ...]
+    # ----- Phase 3: Embedding Provider (for convergence detection) -----
+    "embedding_provider": "sentence_transformers",  # "sentence_transformers" | "openai" | "google" | "litellm"
+    "embedding_model": "all-MiniLM-L6-v2",          # Provider-specific model name
+    "embedding_dimension": 384,                      # Expected embedding dimension
+    # ----- Phase 3: Dynamic Convergence Detection -----
+    "debate_convergence_enabled": True,    # Enable semantic convergence detection
+    "debate_semantic_threshold": 0.85,     # Cosine similarity threshold for convergence
+    "debate_info_gain_threshold": 0.1,     # Minimum information gain to continue
+    # ----- Phase 3: Deep Research -----
+    "deep_research_enabled": False,        # Default off, enable per-analysis
+    "deep_research_provider": "gemini",    # "gemini" (priority) | "openai"
+    "deep_research_model": "gemini-2.0-flash",  # Model for deep research
+    "deep_research_triggers": ["first_analysis", "pre_earnings"],  # Trigger conditions
+    "force_deep_research": False,          # Force deep research on every analysis
+    # ----- Phase 3: Earnings Tracking -----
+    "earnings_tracking_enabled": True,     # Enable earnings date tracking
+    "earnings_lookahead_days": 14,         # Days to look ahead for earnings
+    "earnings_imminent_days": 3,           # Days threshold for "imminent" alerts
 }
+

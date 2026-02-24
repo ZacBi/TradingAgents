@@ -39,6 +39,14 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            # Phase 3: Deep Research
+            "deep_research_report": "",
+            "deep_research_sources": [],
+            # Phase 3: Expert evaluations
+            "expert_evaluations": [],
+            # Phase 3: Earnings tracking
+            "earnings_alert": None,
+            "earnings_analysis": "",
         }
 
     def get_graph_args(self, callbacks: Optional[List] = None, thread_id: Optional[str] = None) -> Dict[str, Any]:

@@ -1,4 +1,4 @@
-from typing import Annotated, Sequence
+from typing import Annotated, Sequence, Any
 from datetime import date, timedelta, datetime
 from typing_extensions import TypedDict, Optional
 from langchain_openai import ChatOpenAI
@@ -47,6 +47,15 @@ class RiskDebateState(TypedDict):
     count: Annotated[int, "Length of the current conversation"]  # Conversation length
 
 
+# Phase 3: Expert evaluation state
+class ExpertEvaluationState(TypedDict):
+    """State for a single expert's evaluation."""
+    expert_id: Annotated[str, "Unique identifier of the expert"]
+    expert_name: Annotated[str, "Display name of the expert"]
+    evaluation: Annotated[dict, "Structured evaluation output"]
+    raw_response: Annotated[str, "Raw LLM response"]
+
+
 class AgentState(MessagesState):
     company_of_interest: Annotated[str, "Company that we are interested in trading"]
     trade_date: Annotated[str, "What date we are trading at"]
@@ -60,6 +69,19 @@ class AgentState(MessagesState):
         str, "Report from the News Researcher of current world affairs"
     ]
     fundamentals_report: Annotated[str, "Report from the Fundamentals Researcher"]
+
+    # Phase 3: Deep Research
+    deep_research_report: Annotated[str, "Report from Deep Research Agent"]
+    deep_research_sources: Annotated[list, "Sources used in deep research"]
+
+    # Phase 3: Expert evaluations
+    expert_evaluations: Annotated[
+        list, "List of expert evaluation states"
+    ]
+
+    # Phase 3: Earnings tracking
+    earnings_alert: Annotated[dict, "Upcoming earnings alert if any"]
+    earnings_analysis: Annotated[str, "Pre-earnings analysis if applicable"]
 
     # researcher team discussion step
     investment_debate_state: Annotated[
