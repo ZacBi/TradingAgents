@@ -94,11 +94,14 @@ class DatabaseManager:
 
     def record_trade(self, trade: Dict[str, Any]) -> int:
         """Insert a trade record and return its id."""
-        cols = [
+        # Only include keys that are actually provided; let SQLite
+        # apply column defaults for omitted NOT-NULL-with-DEFAULT cols.
+        allowed = {
             "ticker", "action", "quantity", "price",
             "commission", "realized_pnl", "decision_id",
-        ]
-        values = [trade.get(c) for c in cols]
+        }
+        cols = [c for c in allowed if trade.get(c) is not None]
+        values = [trade[c] for c in cols]
         placeholders = ", ".join("?" for _ in cols)
         col_names = ", ".join(cols)
 
