@@ -132,6 +132,7 @@ class TradingAgentsGraph:
             self.invest_judge_memory,
             self.risk_manager_memory,
             self.conditional_logic,
+            checkpointer=self.checkpointer,
         )
 
         self.propagator = Propagator()
@@ -147,6 +148,11 @@ class TradingAgentsGraph:
         self.db = None
         if self.config.get("database_enabled"):
             self._init_database()
+
+        # --- Phase 0: LangGraph Checkpointing ---
+        self.checkpointer = None
+        if self.config.get("checkpointing_enabled"):
+            self._init_checkpointer()
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
@@ -194,6 +200,31 @@ class TradingAgentsGraph:
         except Exception as exc:
             logger.warning("Database init failed: %s", exc)
             self.db = None
+
+    def _init_checkpointer(self):
+        """Initialize LangGraph checkpointer based on config."""
+        try:
+            storage = self.config.get("checkpoint_storage", "memory")
+            if storage == "memory":
+                from langgraph.checkpoint.memory import MemorySaver
+                self.checkpointer = MemorySaver()
+                logger.info("LangGraph MemorySaver checkpointer initialized.")
+            elif storage == "sqlite":
+                from langgraph.checkpoint.sqlite import SqliteSaver
+                db_path = self.config.get("checkpoint_db_path", "checkpoints.db")
+                self.checkpointer = SqliteSaver.from_conn_string(db_path)
+                logger.info("LangGraph SQLite checkpointer at %s", db_path)
+            else:
+                logger.warning("Unknown checkpoint_storage: %s", storage)
+        except ImportError as exc:
+            logger.warning(
+                "Checkpointer init failed (missing package?): %s. "
+                "For sqlite storage, install langgraph-checkpoint-sqlite.", exc
+            )
+            self.checkpointer = None
+        except Exception as exc:
+            logger.warning("Checkpointer init failed: %s", exc)
+            self.checkpointer = None
 
     def _create_routed_llm(self, role_type: str, llm_kwargs: dict):
         """Create an LLM instance via model routing config."""
@@ -276,7 +307,13 @@ class TradingAgentsGraph:
         init_agent_state = self.propagator.create_initial_state(
             company_name, trade_date
         )
-        args = self.propagator.get_graph_args()
+
+        # Generate thread_id for checkpointing (only when enabled)
+        thread_id = None
+        if self.checkpointer is not None:
+            thread_id = f"{company_name}-{trade_date}"
+
+        args = self.propagator.get_graph_args(thread_id=thread_id)
 
         if self.debug:
             # Debug mode with tracing
@@ -311,10 +348,22 @@ class TradingAgentsGraph:
     def _persist_decision(self, final_state: dict, signal: str):
         """Save the decision and related data to the database."""
         try:
+            # Extract Langfuse trace_id if available
+            trace_id = trace_url = None
+            if self.config.get("langfuse_enabled") and self.callbacks:
+                for cb in self.callbacks:
+                    if hasattr(cb, "trace_id") and cb.trace_id:
+                        trace_id = cb.trace_id
+                        host = self.config.get("langfuse_host", "http://localhost:3000")
+                        trace_url = f"{host}/trace/{trace_id}"
+                        break
+
             decision_id = self.db.save_decision({
                 "ticker": final_state.get("company_of_interest", self.ticker),
                 "trade_date": final_state.get("trade_date", ""),
                 "final_decision": signal,
+                "langfuse_trace_id": trace_id,
+                "langfuse_trace_url": trace_url,
                 "market_report": final_state.get("market_report", ""),
                 "sentiment_report": final_state.get("sentiment_report", ""),
                 "news_report": final_state.get("news_report", ""),
@@ -322,7 +371,7 @@ class TradingAgentsGraph:
                 "debate_history": final_state.get("investment_debate_state", {}).get("history", ""),
                 "risk_assessment": final_state.get("risk_debate_state", {}).get("history", ""),
             })
-            logger.info("Decision persisted: id=%d signal=%s", decision_id, signal)
+            logger.info("Decision persisted: id=%d signal=%s trace_id=%s", decision_id, signal, trace_id)
         except Exception as exc:
             logger.warning("Failed to persist decision: %s", exc)
 

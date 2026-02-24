@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS agent_decisions (
     trade_date          TEXT NOT NULL,
     final_decision      TEXT NOT NULL,       -- BUY / SELL / HOLD
     confidence          REAL,
+    langfuse_trace_id   TEXT,
+    langfuse_trace_url  TEXT,
     market_report       TEXT,
     sentiment_report    TEXT,
     news_report         TEXT,

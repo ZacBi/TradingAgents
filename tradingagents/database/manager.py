@@ -5,6 +5,7 @@ Uses Python's built-in sqlite3 — no external ORM dependency.
 """
 
 import json
+import logging
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,25 +13,43 @@ from typing import Any, Dict, List, Optional
 
 from .schema import SCHEMA_SQL
 
+logger = logging.getLogger(__name__)
+
 
 class DatabaseManager:
     """Manages a single SQLite database with the TradingAgents schema."""
 
     def __init__(self, db_path: str = "tradingagents.db"):
         self.db_path = db_path
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        self._is_memory = db_path == ":memory:"
+        self._shared_conn: Optional[sqlite3.Connection] = None
+        if not self._is_memory:
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
+        self._migrate_schema()
 
     # ------------------------------------------------------------------
     # Connection helpers
     # ------------------------------------------------------------------
 
-    @contextmanager
-    def _connect(self):
+    def _get_connection(self) -> sqlite3.Connection:
+        """获取数据库连接。内存数据库复用同一连接，文件数据库每次新建。"""
+        if self._is_memory:
+            if self._shared_conn is None:
+                conn = sqlite3.connect(":memory:")
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA foreign_keys=ON")
+                self._shared_conn = conn
+            return self._shared_conn
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
+        return conn
+
+    @contextmanager
+    def _connect(self):
+        conn = self._get_connection()
         try:
             yield conn
             conn.commit()
@@ -38,11 +57,34 @@ class DatabaseManager:
             conn.rollback()
             raise
         finally:
-            conn.close()
+            if not self._is_memory:
+                conn.close()
 
     def _init_schema(self):
         with self._connect() as conn:
             conn.executescript(SCHEMA_SQL)
+
+    def _migrate_schema(self):
+        """Apply incremental schema migrations for existing databases."""
+        with self._connect() as conn:
+            # 检查表是否存在（全新数据库由 _init_schema 创建，无需迁移）
+            table_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_decisions'"
+            ).fetchone()
+            if not table_exists:
+                return
+            cursor = conn.execute("PRAGMA table_info(agent_decisions)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "langfuse_trace_id" not in columns:
+                conn.execute(
+                    "ALTER TABLE agent_decisions ADD COLUMN langfuse_trace_id TEXT"
+                )
+                logger.info("Added langfuse_trace_id column to agent_decisions")
+            if "langfuse_trace_url" not in columns:
+                conn.execute(
+                    "ALTER TABLE agent_decisions ADD COLUMN langfuse_trace_url TEXT"
+                )
+                logger.info("Added langfuse_trace_url column to agent_decisions")
 
     # ------------------------------------------------------------------
     # agent_decisions
@@ -52,11 +94,13 @@ class DatabaseManager:
         """Insert a new agent decision and return its id.
 
         Expected keys: ticker, trade_date, final_decision, and optionally
-        confidence, market_report, sentiment_report, news_report,
-        fundamentals_report, debate_history, expert_opinions, risk_assessment.
+        confidence, langfuse_trace_id, langfuse_trace_url, market_report,
+        sentiment_report, news_report, fundamentals_report, debate_history,
+        expert_opinions, risk_assessment.
         """
         cols = [
             "ticker", "trade_date", "final_decision", "confidence",
+            "langfuse_trace_id", "langfuse_trace_url",
             "market_report", "sentiment_report", "news_report",
             "fundamentals_report", "debate_history", "expert_opinions",
             "risk_assessment",

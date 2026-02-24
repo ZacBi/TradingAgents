@@ -43,6 +43,10 @@ DEFAULT_CONFIG = {
     "langfuse_secret_key": None,        # or set LANGFUSE_SECRET_KEY env var
     "langfuse_host": "http://localhost:3000",
     # ----- Phase 1: Database (SQLite) -----
-    "database_enabled": False,
+    "database_enabled": True,
     "database_path": "tradingagents.db",
+    # ----- Phase 0: LangGraph Checkpointing -----
+    "checkpointing_enabled": True,
+    "checkpoint_storage": "memory",        # memory | sqlite (sqlite requires langgraph-checkpoint-sqlite)
+    "checkpoint_db_path": "checkpoints.db",
 }

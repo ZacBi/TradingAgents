@@ -828,17 +828,17 @@ flowchart LR
 ## 十二、实施路线图
 
 ### 阶段0: 环境准备
-- [ ] 升级LangGraph到1.0
-- [ ] 部署LiteLLM网关 + 配置多平台密钥
-- [ ] 部署Langfuse自托管实例
-- [ ] 设置SQLite数据库
+- [x] 升级LangGraph到1.0
+- [x] 部署LiteLLM网关 + 配置多平台密钥
+- [x] 部署Langfuse自托管实例
+- [x] 设置SQLite数据库
 
 ### 阶段1: 核心架构升级
-- [ ] LangGraph 1.0 Checkpointing集成
-- [ ] Langfuse追踪回调接入
-- [ ] LiteLLM分层模型配置（YAML配置化）
-- [ ] 持仓管理数据库实现
-- [ ] 重构 `trading_graph.py` 支持模型路由
+- [x] LangGraph 1.0 Checkpointing集成
+- [x] Langfuse追踪回调接入
+- [x] LiteLLM分层模型配置（YAML配置化）
+- [x] 持仓管理数据库实现
+- [x] 重构 `trading_graph.py` 支持模型路由
 
 ### 阶段2: 数据源升级
 - [ ] Yahoo Finance增强（财报日期、估值指标、机构持仓）

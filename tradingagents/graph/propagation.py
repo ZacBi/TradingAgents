@@ -41,16 +41,19 @@ class Propagator:
             "news_report": "",
         }
 
-    def get_graph_args(self, callbacks: Optional[List] = None) -> Dict[str, Any]:
+    def get_graph_args(self, callbacks: Optional[List] = None, thread_id: Optional[str] = None) -> Dict[str, Any]:
         """Get arguments for the graph invocation.
 
         Args:
             callbacks: Optional list of callback handlers for tool execution tracking.
                        Note: LLM callbacks are handled separately via LLM constructor.
+            thread_id: Optional thread ID for checkpointing (e.g., "AAPL-2026-02-25").
         """
         config = {"recursion_limit": self.max_recur_limit}
         if callbacks:
             config["callbacks"] = callbacks
+        if thread_id:
+            config["configurable"] = {"thread_id": thread_id}
         return {
             "stream_mode": "values",
             "config": config,
