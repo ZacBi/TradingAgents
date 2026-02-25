@@ -152,6 +152,8 @@ class TradingAgentsGraph:
             self.risk_manager_memory,
             self.conditional_logic,
             checkpointer=self.checkpointer,
+            config=self.config,
+            prompt_manager=self.prompt_manager,
         )
 
         self.propagator = Propagator()
@@ -413,6 +415,7 @@ class TradingAgentsGraph:
                 "sentiment_report": final_state.get("sentiment_report", ""),
                 "news_report": final_state.get("news_report", ""),
                 "fundamentals_report": final_state.get("fundamentals_report", ""),
+                "valuation_result": final_state.get("valuation_result", ""),
                 "debate_history": final_state.get("investment_debate_state", {}).get("history", ""),
                 "risk_assessment": final_state.get("risk_debate_state", {}).get("history", ""),
             })
@@ -429,6 +432,7 @@ class TradingAgentsGraph:
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],
+            "valuation_result": final_state.get("valuation_result", ""),
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

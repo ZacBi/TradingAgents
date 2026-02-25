@@ -26,6 +26,8 @@ class GraphSetup:
         risk_manager_memory,
         conditional_logic: ConditionalLogic,
         checkpointer=None,
+        config: Dict[str, Any] = None,
+        prompt_manager=None,
     ):
         """Initialize with required components."""
         self.quick_thinking_llm = quick_thinking_llm
@@ -38,6 +40,8 @@ class GraphSetup:
         self.risk_manager_memory = risk_manager_memory
         self.conditional_logic = conditional_logic
         self.checkpointer = checkpointer
+        self.config = config or {}
+        self.prompt_manager = prompt_manager
 
     def setup_graph(
         self, selected_analysts=["market", "social", "news", "fundamentals"]
@@ -110,6 +114,17 @@ class GraphSetup:
         # Create workflow
         workflow = StateGraph(AgentState)
 
+        # Phase 4: Create valuation node if enabled
+        valuation_enabled = self.config.get("valuation_enabled", True)
+        valuation_node = None
+        if valuation_enabled:
+            from tradingagents.valuation import create_valuation_node
+            valuation_node = create_valuation_node(
+                llm=self.quick_thinking_llm,
+                prompt_manager=self.prompt_manager,
+                config=self.config,
+            )
+
         # Add analyst nodes to the graph
         for analyst_type, node in analyst_nodes.items():
             workflow.add_node(f"{analyst_type.capitalize()} Analyst", node)
@@ -119,6 +134,8 @@ class GraphSetup:
             workflow.add_node(f"tools_{analyst_type}", tool_nodes[analyst_type])
 
         # Add other nodes
+        if valuation_node is not None:
+            workflow.add_node("Valuation Analyst", valuation_node)
         workflow.add_node("Bull Researcher", bull_researcher_node)
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
@@ -147,12 +164,19 @@ class GraphSetup:
             )
             workflow.add_edge(current_tools, current_analyst)
 
-            # Connect to next analyst or to Bull Researcher if this is the last analyst
+            # Connect to next analyst or to Valuation/Bull Researcher if this is the last analyst
             if i < len(selected_analysts) - 1:
                 next_analyst = f"{selected_analysts[i+1].capitalize()} Analyst"
                 workflow.add_edge(current_clear, next_analyst)
             else:
-                workflow.add_edge(current_clear, "Bull Researcher")
+                if valuation_enabled:
+                    workflow.add_edge(current_clear, "Valuation Analyst")
+                else:
+                    workflow.add_edge(current_clear, "Bull Researcher")
+
+        # Phase 4: Valuation → Bull Researcher
+        if valuation_enabled:
+            workflow.add_edge("Valuation Analyst", "Bull Researcher")
 
         # Add remaining edges
         workflow.add_conditional_edges(

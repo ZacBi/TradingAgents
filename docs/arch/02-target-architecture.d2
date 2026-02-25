@@ -24,10 +24,9 @@ LLMGateway: LLM网关层 - LiteLLM {
   Bailian: 百炼 Qwen/DS
   OpenRouter: OpenRouter GPT/Claude
   Ollama: Ollama 本地模型
-  UnifiedAPI: |md
-    **统一API接口**
-    自动fallback / 成本路由 / 负载均衡
-  |
+  UnifiedAPI: 统一API接口 {
+    desc: 自动fallback / 成本路由 / 负载均衡
+  }
   Google -> UnifiedAPI
   Bailian -> UnifiedAPI
   OpenRouter -> UnifiedAPI
@@ -45,10 +44,9 @@ DataLayer: 数据层 {
   }
   Paid: 付费数据源 {
     style.fill: "#fff8e1"
-    Longport: |md
-      长桥 Longport API
-      港/美/A股实时行情+交易
-    |
+    Longport: 长桥Longport API {
+      desc: 港/美/A股实时行情+交易
+    }
   }
 }
 
@@ -56,11 +54,10 @@ AgentOrch: Agent编排层 - LangGraph 1.0 {
   style.fill: "#e8f5e9"
   style.stroke: "#4caf50"
   
-  Features: |md
-    **特性**: Checkpointing | Subgraph | Human-in-the-Loop | Streaming
-  | {
+  Features: 特性 {
     shape: text
     style.font-size: 12
+    desc: Checkpointing | Subgraph | Human-in-the-Loop | Streaming
   }
 
   Phase1: 阶段1: 数据收集 (并行) {
@@ -87,7 +84,8 @@ AgentOrch: Agent编排层 - LangGraph 1.0 {
     TrendTeam: 趋势/投机团队 {
       Bull: Bull Researcher
       Bear: Bear Researcher
-      Bull <-> Bear: 动态收敛辩论
+      Bull -> Bear: 动态收敛辩论
+      Bear -> Bull: 反馈调整
     }
     ValueTeam: 价值投资团队 (动态选择N个专家) {
       Buffett: Buffett Agent
@@ -129,10 +127,9 @@ Persist: 持久化层 {
     Episodic: 情节记忆 (历史案例)
     Semantic: 语义记忆 (市场规律)
   }
-  Checkpoints: |md
-    LangGraph Checkpoints
-    状态快照，支持回滚/重放
-  |
+  Checkpoints: LangGraph Checkpoints {
+    desc: 状态快照，支持回滚/重放
+  }
 }
 
 Display: 展示层 (渐进式) {
@@ -143,9 +140,7 @@ Display: 展示层 (渐进式) {
 }
 
 # 连接关系
-Observe -> AgentOrch: 监控所有Agent节点 {
-  style.stroke-dash: 3
-}
+Observe -> AgentOrch: 监控所有Agent节点
 LLMGateway.UnifiedAPI -> AgentOrch
 DataLayer -> AgentOrch
 AgentOrch -> Persist

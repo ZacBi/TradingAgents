@@ -7,24 +7,40 @@ Registry: Expert Agent Registry {
   Profile: ExpertProfile (注册信息) {
     style.fill: "#fff8e1"
     style.stroke: "#f9a825"
-    content: |md
-      - name | philosophy | style
-      - best_for: sectors, market_cap, volatility
-      - prompt_template | role_type
-    |
+    content_desc: 专家档案信息 {
+      desc: name | philosophy | style | best_for: sectors, market_cap, volatility | prompt_template | role_type
+    }
   }
 
   Experts: 已注册专家池 {
     style.fill: "#c8e6c9"
-    Graham: Ben Graham\n深度价值, 烟蒂股
-    Buffett: Warren Buffett\n护城河, 长期持有
-    Munger: Charlie Munger\n多元思维, 逆向检验
-    Lynch: Peter Lynch\n成长价值, PEG
-    Livermore: Jesse Livermore\n趋势投机, 关键点
-    Greenblatt: Joel Greenblatt\n魔法公式, 量化
-    Marks: Howard Marks\n周期投资, 风险意识
-    Dalio: Ray Dalio\n全天候, 宏观对冲
-    Custom: ... 自定义专家\n用户可注册新专家
+    Graham: Ben Graham {
+      desc: 深度价值, 烟蒂股
+    }
+    Buffett: Warren Buffett {
+      desc: 护城河, 长期持有
+    }
+    Munger: Charlie Munger {
+      desc: 多元思维, 逆向检验
+    }
+    Lynch: Peter Lynch {
+      desc: 成长价值, PEG
+    }
+    Livermore: Jesse Livermore {
+      desc: 趋势投机, 关键点
+    }
+    Greenblatt: Joel Greenblatt {
+      desc: 魔法公式, 量化
+    }
+    Marks: Howard Marks {
+      desc: 周期投资, 风险意识
+    }
+    Dalio: Ray Dalio {
+      desc: 全天候, 宏观对冲
+    }
+    Custom: 自定义专家 {
+      desc: 用户可注册新专家
+    }
   }
 }
 
@@ -32,24 +48,17 @@ Selector: Expert Selector (动态选择器) {
   style.fill: "#e3f2fd"
   style.stroke: "#1565c0"
 
-  Input: |md
-    **输入:**
-    - 股票特征 (行业/市值/波动率/PE)
-    - 市场环境 (牛/熊/震荡)
-    - 用户偏好 (可选)
-  |
+  InputSection: 输入信息 {
+    desc: 股票特征 (行业/市值/波动率/PE) | 市场环境 (牛/熊/震荡) | 用户偏好 (可选)
+  }
 
-  Strategy: |md
-    **选择策略:**
-    - 特征匹配 best_for
-    - 多样性保障
-    - 数量控制 2~5个
-    - 用户覆盖
-  |
+  StrategySection: 选择策略 {
+    desc: 特征匹配 best_for | 多样性保障 | 数量控制 2~5个 | 用户覆盖
+  }
 
   Output: 输出: 选定的专家Agent列表
 
-  Input -> Strategy -> Output
+  InputSection -> StrategySection -> Output
 }
 
 Registry -> Selector

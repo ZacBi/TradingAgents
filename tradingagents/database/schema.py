@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS agent_decisions (
     sentiment_report    TEXT,
     news_report         TEXT,
     fundamentals_report TEXT,
+    valuation_result    TEXT,
     debate_history      TEXT,
     expert_opinions     TEXT,
     risk_assessment     TEXT,

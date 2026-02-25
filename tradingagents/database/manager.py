@@ -85,6 +85,11 @@ class DatabaseManager:
                     "ALTER TABLE agent_decisions ADD COLUMN langfuse_trace_url TEXT"
                 )
                 logger.info("Added langfuse_trace_url column to agent_decisions")
+            if "valuation_result" not in columns:
+                conn.execute(
+                    "ALTER TABLE agent_decisions ADD COLUMN valuation_result TEXT"
+                )
+                logger.info("Added valuation_result column to agent_decisions")
 
     # ------------------------------------------------------------------
     # agent_decisions
@@ -95,15 +100,15 @@ class DatabaseManager:
 
         Expected keys: ticker, trade_date, final_decision, and optionally
         confidence, langfuse_trace_id, langfuse_trace_url, market_report,
-        sentiment_report, news_report, fundamentals_report, debate_history,
-        expert_opinions, risk_assessment.
+        sentiment_report, news_report, fundamentals_report, valuation_result,
+        debate_history, expert_opinions, risk_assessment.
         """
         cols = [
             "ticker", "trade_date", "final_decision", "confidence",
             "langfuse_trace_id", "langfuse_trace_url",
             "market_report", "sentiment_report", "news_report",
-            "fundamentals_report", "debate_history", "expert_opinions",
-            "risk_assessment",
+            "fundamentals_report", "valuation_result", "debate_history",
+            "expert_opinions", "risk_assessment",
         ]
         values = [decision.get(c) for c in cols]
         placeholders = ", ".join("?" for _ in cols)

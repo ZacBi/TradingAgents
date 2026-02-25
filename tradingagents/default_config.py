@@ -85,5 +85,12 @@ DEFAULT_CONFIG = {
     "prompt_cache_ttl": 300,               # Seconds to cache prompts (0 = disable)
     "prompt_fallback_enabled": True,       # Use local fallback if Langfuse unavailable
     "prompt_version": None,                # None = production, or specific version
+    # ----- Phase 4: Value Investing Framework -----
+    "valuation_enabled": True,             # Enable valuation analysis stage
+    "valuation_dcf_projection_years": 5,   # Years to project FCF
+    "valuation_terminal_growth_rate": 0.025,  # Terminal (perpetuity) growth rate
+    "valuation_risk_free_rate": 0.04,      # Risk-free rate for WACC
+    "valuation_market_risk_premium": 0.06, # Equity risk premium
+    "valuation_graham_safety_threshold": 0.30,  # Graham margin of safety threshold
 }
 

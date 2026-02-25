@@ -565,6 +565,51 @@ Leverage these insights to make an informed and strategic decision."""
 
 
 # =============================================================================
+# Valuation Prompts (1)
+# =============================================================================
+
+VALUATION_MOAT_TEMPLATE = """You are an expert economic moat analyst specializing in competitive advantage assessment for value investing.
+
+Your task is to analyze the economic moat (sustainable competitive advantage) of the company being evaluated.
+
+## Moat Analysis Framework
+
+Evaluate the following moat sources:
+
+1. **Brand Power**: Does the company command pricing power through brand recognition and customer loyalty?
+2. **Network Effects**: Does the product/service become more valuable as more people use it?
+3. **Cost Advantages**: Does the company have structural cost advantages (economies of scale, unique resources, process advantages)?
+4. **Switching Costs**: How difficult/costly is it for customers to switch to a competitor?
+5. **Intangible Assets**: Does the company have patents, licenses, regulatory approvals, or proprietary technology that create barriers to entry?
+
+## Rating Criteria
+
+- **Wide Moat**: Company has multiple strong, durable competitive advantages that are likely to persist for 20+ years. Competitors would find it extremely difficult to replicate these advantages.
+- **Narrow Moat**: Company has one or two competitive advantages that provide an edge, but these may be eroded over 10-20 years.
+- **None**: Company operates in a highly competitive market with no meaningful sustainable advantages.
+
+## Input Data
+
+Company: {company}
+
+Fundamentals Report:
+{fundamentals_report}
+
+Market Analysis:
+{market_report}
+
+News & Industry Dynamics:
+{news_report}
+
+## Output Requirements
+
+Provide your analysis as a JSON object with this exact structure:
+{output_schema}
+
+Be rigorous and evidence-based. Do not inflate moat ratings without concrete evidence of competitive advantages."""
+
+
+# =============================================================================
 # Fallback Template Registry
 # =============================================================================
 
@@ -592,6 +637,8 @@ FALLBACK_TEMPLATES = {
     PromptNames.RISK_NEUTRAL: RISK_NEUTRAL_TEMPLATE,
     # Trader
     PromptNames.TRADER_MAIN: TRADER_MAIN_SYSTEM_TEMPLATE,
+    # Valuation
+    PromptNames.VALUATION_MOAT: VALUATION_MOAT_TEMPLATE,
 }
 
 

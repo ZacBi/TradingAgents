@@ -38,6 +38,9 @@ class PromptNames:
     # Trader Prompt (1)
     TRADER_MAIN = "trader-main"
 
+    # Valuation Prompt (1)
+    VALUATION_MOAT = "valuation-moat"
+
 
 # Langfuse label mapping (for organization in UI)
 PROMPT_LABELS = {
@@ -58,6 +61,7 @@ PROMPT_LABELS = {
     PromptNames.RISK_CONSERVATIVE: "risk/conservative",
     PromptNames.RISK_NEUTRAL: "risk/neutral",
     PromptNames.TRADER_MAIN: "trader/main",
+    PromptNames.VALUATION_MOAT: "valuation/moat",
 }
 
 # All prompt names as a list (for iteration)
@@ -79,4 +83,5 @@ ALL_PROMPT_NAMES = [
     PromptNames.RISK_CONSERVATIVE,
     PromptNames.RISK_NEUTRAL,
     PromptNames.TRADER_MAIN,
+    PromptNames.VALUATION_MOAT,
 ]
