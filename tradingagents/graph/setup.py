@@ -4,11 +4,13 @@ from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import ToolNode
+from langgraph.types import Send
 
 from tradingagents.agents import *
 from tradingagents.agents.utils.agent_states import AgentState
 
 from .conditional_logic import ConditionalLogic
+from .subgraphs.analyst_subgraph import create_analyst_subgraph, create_analyst_runner
 
 
 class GraphSetup:
@@ -58,37 +60,32 @@ class GraphSetup:
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
 
-        # Create analyst nodes
+        # Create analyst nodes and tool nodes
         analyst_nodes = {}
-        delete_nodes = {}
         tool_nodes = {}
 
         if "market" in selected_analysts:
             analyst_nodes["market"] = create_market_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
         if "social" in selected_analysts:
             analyst_nodes["social"] = create_social_media_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["social"] = create_msg_delete()
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
             analyst_nodes["news"] = create_news_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["news"] = create_msg_delete()
             tool_nodes["news"] = self.tool_nodes["news"]
 
         if "fundamentals" in selected_analysts:
             analyst_nodes["fundamentals"] = create_fundamentals_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
         # Create researcher and manager nodes
@@ -125,13 +122,13 @@ class GraphSetup:
                 config=self.config,
             )
 
-        # Add analyst nodes to the graph
-        for analyst_type, node in analyst_nodes.items():
-            workflow.add_node(f"{analyst_type.capitalize()} Analyst", node)
-            workflow.add_node(
-                f"Msg Clear {analyst_type.capitalize()}", delete_nodes[analyst_type]
+        # 构建分析师子图 runner 节点 (封装 tool-call 循环, 支持并行)
+        for analyst_type in selected_analysts:
+            subgraph = create_analyst_subgraph(
+                analyst_nodes[analyst_type], tool_nodes[analyst_type]
             )
-            workflow.add_node(f"tools_{analyst_type}", tool_nodes[analyst_type])
+            runner = create_analyst_runner(analyst_type, subgraph)
+            workflow.add_node(f"Analyst_{analyst_type}", runner)
 
         # Add other nodes
         if valuation_node is not None:
@@ -145,34 +142,19 @@ class GraphSetup:
         workflow.add_node("Conservative Analyst", conservative_analyst)
         workflow.add_node("Risk Judge", risk_manager_node)
 
-        # Define edges
-        # Start with the first analyst
-        first_analyst = selected_analysts[0]
-        workflow.add_edge(START, f"{first_analyst.capitalize()} Analyst")
+        # 并行调度所有分析师 (Send API)
+        _selected = list(selected_analysts)  # closure capture
 
-        # Connect analysts in sequence
-        for i, analyst_type in enumerate(selected_analysts):
-            current_analyst = f"{analyst_type.capitalize()} Analyst"
-            current_tools = f"tools_{analyst_type}"
-            current_clear = f"Msg Clear {analyst_type.capitalize()}"
+        def dispatch_analysts(state):
+            return [Send(f"Analyst_{t}", state) for t in _selected]
 
-            # Add conditional edges for current analyst
-            workflow.add_conditional_edges(
-                current_analyst,
-                getattr(self.conditional_logic, f"should_continue_{analyst_type}"),
-                [current_tools, current_clear],
-            )
-            workflow.add_edge(current_tools, current_analyst)
+        analyst_node_names = [f"Analyst_{t}" for t in selected_analysts]
+        workflow.add_conditional_edges(START, dispatch_analysts, analyst_node_names)
 
-            # Connect to next analyst or to Valuation/Bull Researcher if this is the last analyst
-            if i < len(selected_analysts) - 1:
-                next_analyst = f"{selected_analysts[i+1].capitalize()} Analyst"
-                workflow.add_edge(current_clear, next_analyst)
-            else:
-                if valuation_enabled:
-                    workflow.add_edge(current_clear, "Valuation Analyst")
-                else:
-                    workflow.add_edge(current_clear, "Bull Researcher")
+        # 所有分析师完成后汇聚到下一阶段
+        next_after_analysts = "Valuation Analyst" if valuation_enabled else "Bull Researcher"
+        for analyst_type in selected_analysts:
+            workflow.add_edge(f"Analyst_{analyst_type}", next_after_analysts)
 
         # Phase 4: Valuation → Bull Researcher
         if valuation_enabled:

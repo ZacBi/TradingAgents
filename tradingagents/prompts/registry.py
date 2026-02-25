@@ -85,3 +85,25 @@ ALL_PROMPT_NAMES = [
     PromptNames.TRADER_MAIN,
     PromptNames.VALUATION_MOAT,
 ]
+
+# PromptName → YAML 文件相对路径映射 (相对于 templates/ 目录)
+TEMPLATE_PATH_MAP = {
+    PromptNames.EXPERT_BUFFETT: "experts/buffett.yaml",
+    PromptNames.EXPERT_MUNGER: "experts/munger.yaml",
+    PromptNames.EXPERT_LYNCH: "experts/lynch.yaml",
+    PromptNames.EXPERT_LIVERMORE: "experts/livermore.yaml",
+    PromptNames.EXPERT_GRAHAM: "experts/graham.yaml",
+    PromptNames.ANALYST_MARKET: "analysts/market.yaml",
+    PromptNames.ANALYST_SOCIAL: "analysts/social.yaml",
+    PromptNames.ANALYST_NEWS: "analysts/news.yaml",
+    PromptNames.ANALYST_FUNDAMENTALS: "analysts/fundamentals.yaml",
+    PromptNames.RESEARCHER_BULL: "researchers/bull.yaml",
+    PromptNames.RESEARCHER_BEAR: "researchers/bear.yaml",
+    PromptNames.MANAGER_RESEARCH: "managers/research.yaml",
+    PromptNames.MANAGER_RISK: "managers/risk.yaml",
+    PromptNames.RISK_AGGRESSIVE: "risk/aggressive.yaml",
+    PromptNames.RISK_CONSERVATIVE: "risk/conservative.yaml",
+    PromptNames.RISK_NEUTRAL: "risk/neutral.yaml",
+    PromptNames.TRADER_MAIN: "trader/main.yaml",
+    PromptNames.VALUATION_MOAT: "valuation/moat.yaml",
+}

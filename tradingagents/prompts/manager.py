@@ -11,10 +11,15 @@ Provides centralized prompt management with:
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .fallback import FALLBACK_TEMPLATES, get_fallback_template
-from .registry import PromptNames, PROMPT_LABELS
+import yaml
+
+from .registry import PromptNames, PROMPT_LABELS, ALL_PROMPT_NAMES, TEMPLATE_PATH_MAP
+
+# templates/ 目录绝对路径
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 logger = logging.getLogger(__name__)
 
@@ -207,11 +212,21 @@ class PromptManager:
             return None
     
     def _get_fallback(self, name: str) -> Optional[str]:
-        """Get fallback template from local storage."""
+        """从 YAML 文件加载 fallback 模板."""
+        rel_path = TEMPLATE_PATH_MAP.get(name)
+        if rel_path is None:
+            logger.warning("No YAML template mapping for prompt '%s'", name)
+            return None
+        yaml_path = _TEMPLATES_DIR / rel_path
         try:
-            return get_fallback_template(name)
-        except KeyError:
-            logger.warning("No fallback template for prompt '%s'", name)
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            return data.get("template")
+        except FileNotFoundError:
+            logger.warning("YAML template file not found: %s", yaml_path)
+            return None
+        except Exception as exc:
+            logger.warning("Failed to load YAML template '%s': %s", yaml_path, exc)
             return None
     
     def clear_cache(self) -> None:
@@ -232,7 +247,7 @@ class PromptManager:
     
     def list_prompts(self) -> list:
         """List all available prompt names."""
-        return list(FALLBACK_TEMPLATES.keys())
+        return list(ALL_PROMPT_NAMES)
     
     def is_available(self) -> bool:
         """Check if Langfuse is available."""

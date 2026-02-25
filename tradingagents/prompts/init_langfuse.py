@@ -16,9 +16,34 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
+
+import yaml
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+# templates/ 目录绝对路径
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+
+def _load_all_templates() -> dict[str, dict]:
+    """从 YAML 文件加载全部模板，返回 {name: {template, label, ...}} 映射."""
+    from .registry import TEMPLATE_PATH_MAP, PROMPT_LABELS
+
+    templates = {}
+    for name, rel_path in TEMPLATE_PATH_MAP.items():
+        yaml_path = _TEMPLATES_DIR / rel_path
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            templates[name] = {
+                "template": data.get("template", ""),
+                "label": PROMPT_LABELS.get(name, name),
+            }
+        except Exception as exc:
+            logger.warning("Failed to load %s: %s", yaml_path, exc)
+    return templates
 
 
 def upload_prompts(
@@ -35,16 +60,14 @@ def upload_prompts(
         host: Langfuse host URL
         dry_run: If True, only print what would be uploaded
     """
-    from .fallback import FALLBACK_TEMPLATES
-    from .registry import PROMPT_LABELS
+    all_templates = _load_all_templates()
     
     if dry_run:
         logger.info("DRY RUN - No prompts will be uploaded")
-        for name, template in FALLBACK_TEMPLATES.items():
-            label = PROMPT_LABELS.get(name, name)
-            preview = template[:100].replace("\n", " ")
-            logger.info("  [%s] %s: %s...", label, name, preview)
-        logger.info("Total: %d prompts", len(FALLBACK_TEMPLATES))
+        for name, info in all_templates.items():
+            preview = info["template"][:100].replace("\n", " ")
+            logger.info("  [%s] %s: %s...", info["label"], name, preview)
+        logger.info("Total: %d prompts", len(all_templates))
         return
     
     try:
@@ -60,35 +83,31 @@ def upload_prompts(
     )
     
     logger.info("Connected to Langfuse at %s", host)
-    logger.info("Uploading %d prompts...", len(FALLBACK_TEMPLATES))
+    logger.info("Uploading %d prompts...", len(all_templates))
     
     success_count = 0
     error_count = 0
     
-    for name, template in FALLBACK_TEMPLATES.items():
-        label = PROMPT_LABELS.get(name, name)
+    for name, info in all_templates.items():
+        label = info["label"]
+        template = info["template"]
         try:
-            # Create or update the prompt in Langfuse
             client.create_prompt(
                 name=name,
                 prompt=template,
                 labels=[label],
-                is_active=True,  # Set as production version
+                is_active=True,
             )
             logger.info("  Uploaded: %s (%s)", name, label)
             success_count += 1
         except Exception as exc:
-            # If prompt already exists, try to update it
             try:
-                # Langfuse SDK may have different API for update
-                # This is a fallback approach
                 logger.warning("  %s already exists, skipping: %s", name, exc)
-                success_count += 1  # Count as success if it exists
+                success_count += 1
             except Exception as update_exc:
                 logger.error("  Failed to upload %s: %s", name, update_exc)
                 error_count += 1
     
-    # Flush to ensure all data is sent
     client.flush()
     
     logger.info("")

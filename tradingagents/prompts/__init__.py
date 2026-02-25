@@ -5,7 +5,7 @@ Provides centralized prompt management with Langfuse integration:
 - Version control and rollback
 - A/B testing capability
 - Hot reload (no restart needed)
-- Local fallback for reliability
+- Local fallback for reliability (YAML-based)
 
 Usage:
     from tradingagents.prompts import PromptManager, PromptNames
@@ -17,15 +17,11 @@ Usage:
     )
 """
 
-from .registry import PromptNames, PROMPT_LABELS, ALL_PROMPT_NAMES
+from .registry import PromptNames, PROMPT_LABELS, ALL_PROMPT_NAMES, TEMPLATE_PATH_MAP
 from .manager import (
     PromptManager,
     get_prompt_manager,
     reset_prompt_manager,
-)
-from .fallback import (
-    FALLBACK_TEMPLATES,
-    get_fallback_template,
 )
 
 __all__ = [
@@ -33,11 +29,9 @@ __all__ = [
     "PromptNames",
     "PROMPT_LABELS",
     "ALL_PROMPT_NAMES",
+    "TEMPLATE_PATH_MAP",
     # Manager
     "PromptManager",
     "get_prompt_manager",
     "reset_prompt_manager",
-    # Fallback
-    "FALLBACK_TEMPLATES",
-    "get_fallback_template",
 ]

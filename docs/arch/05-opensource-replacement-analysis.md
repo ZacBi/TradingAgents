@@ -308,29 +308,22 @@ graph LR
 
 ### 阶段 1：记忆系统升级 + 技术指标切换
 
-| 步骤 | 改动文件 | 说明 |
-|:---|:---|:---|
-| 1 | `agents/utils/memory.py` | 替换 BM25 → LangGraph InMemoryStore |
-| 2 | `graph/setup.py` | 注入 `store` 到图编译 |
-| 3 | Expert/Researcher 节点 | 签名添加 `store` 参数 |
-| 4 | `dataflows/` 指标模块 | stockstats → pandas-ta |
-| 5 | `pyproject.toml` | 移除 `rank-bm25`，`pandas-ta` 进主依赖 |
+- [x] `agents/utils/memory.py` — 替换 BM25 → LangGraph Store (InMemoryStore / PostgresStore)
+- [x] `graph/trading_graph.py` — 新增 `_init_store()` / `_init_embedder()`，注入 `store` 到图编译
+- [x] `dataflows/stockstats_utils.py` + `y_finance.py` — stockstats → pandas-ta (13 个指标映射)
+- [x] `pyproject.toml` — 移除 `rank-bm25`、`stockstats`，新增 `pandas-ta`、`sqlalchemy`、`alembic`、`pydantic-settings`
 
 ### 阶段 2：PostgreSQL 统一化
 
-| 步骤 | 改动文件 | 说明 |
-|:---|:---|:---|
-| 1 | 新建 `database/models.py` | SQLAlchemy ORM Model |
-| 2 | 引入 `alembic/` | 自动迁移框架 |
-| 3 | `database/manager.py` | Session API 替代裸 SQL |
-| 4 | `graph/trading_graph.py` | Checkpoint → PostgresSaver |
-| 5 | 记忆系统 | InMemoryStore → PostgresStore (pgvector) |
-| 6 | `docker-compose.yml` | PG + pgvector 容器化 |
+- [x] `database/models.py` — 新建 12 个 SQLAlchemy ORM Model (Mapped 类型)
+- [x] `database/manager.py` — Session API 替代裸 sqlite3，支持 SQLite / PostgreSQL 双后端
+- [x] `database/alembic.ini` + `migrations/` — Alembic 迁移框架，含初始迁移脚本
+- [x] `graph/trading_graph.py` — `_init_checkpointer()` 新增 PostgresSaver 分支
+- [x] `default_config.py` — 新增 Store / Embedding / Checkpoint / Postgres 统一配置项
+- [x] `docker-compose.yml` + `scripts/init-db.sql` — PostgreSQL + pgvector + pgAdmin + Langfuse 容器化
 
 ### 阶段 3：配置增强 + 可选优化
 
-| 步骤 | 改动文件 | 说明 |
-|:---|:---|:---|
-| 1 | `default_config.py` | dict → Pydantic Settings |
-| 2 | Prompt Fallback | 迁移到 Jinja2 模板 (可选) |
-| 3 | Graph 并行化 | Analyst 节点使用 `Send` 并行 (可选) |
+- [x] `config/settings.py` — Pydantic Settings v2 (嵌套模型、env var 自动映射、`to_dict()` 向后兼容)
+- [ ] Prompt Fallback — 迁移到 Jinja2 模板 (可选)
+- [ ] Graph 并行化 — Analyst 节点使用 `Send` 并行 (可选)
