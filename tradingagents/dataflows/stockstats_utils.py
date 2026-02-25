@@ -1,12 +1,150 @@
-import pandas as pd
-import yfinance as yf
-from stockstats import wrap
-from typing import Annotated
+"""Technical indicators calculation using pandas-ta.
+
+Replaces stockstats with pandas-ta for explicit, performant indicator calculation.
+"""
+
+import logging
 import os
+from typing import Annotated, Optional
+
+import pandas as pd
+import pandas_ta as ta
+import yfinance as yf
+
 from .config import get_config
+
+logger = logging.getLogger(__name__)
+
+
+# Mapping from legacy stockstats indicator names to pandas-ta functions
+INDICATOR_MAPPING = {
+    # Moving Averages
+    "close_50_sma": ("sma", {"length": 50}),
+    "close_200_sma": ("sma", {"length": 200}),
+    "close_10_ema": ("ema", {"length": 10}),
+    # MACD - returns DataFrame with multiple columns
+    "macd": ("macd", {}),  # Returns MACD_12_26_9
+    "macds": ("macd", {}),  # Returns MACDs_12_26_9
+    "macdh": ("macd", {}),  # Returns MACDh_12_26_9
+    # Momentum
+    "rsi": ("rsi", {"length": 14}),
+    # Bollinger Bands - returns DataFrame with multiple columns
+    "boll": ("bbands", {}),  # Returns BBM_5_2.0
+    "boll_ub": ("bbands", {}),  # Returns BBU_5_2.0
+    "boll_lb": ("bbands", {}),  # Returns BBL_5_2.0
+    # Volatility
+    "atr": ("atr", {"length": 14}),
+    # Volume-based
+    "vwma": ("vwma", {"length": 20}),
+    "mfi": ("mfi", {"length": 14}),
+}
+
+
+def calculate_indicator(df: pd.DataFrame, indicator: str) -> pd.Series:
+    """Calculate a single indicator using pandas-ta.
+
+    Args:
+        df: DataFrame with OHLCV data (Open, High, Low, Close, Volume columns).
+        indicator: Indicator name (stockstats-compatible).
+
+    Returns:
+        Series with calculated indicator values.
+    """
+    if indicator not in INDICATOR_MAPPING:
+        raise ValueError(
+            f"Indicator '{indicator}' not supported. "
+            f"Available: {list(INDICATOR_MAPPING.keys())}"
+        )
+
+    func_name, kwargs = INDICATOR_MAPPING[indicator]
+
+    # Get the pandas-ta function
+    ta_func = getattr(ta, func_name, None)
+    if ta_func is None:
+        raise ValueError(f"pandas-ta function '{func_name}' not found")
+
+    # Prepare input columns (normalize column names)
+    close = df["Close"] if "Close" in df.columns else df["close"]
+    high = df["High"] if "High" in df.columns else df.get("high")
+    low = df["Low"] if "Low" in df.columns else df.get("low")
+    volume = df["Volume"] if "Volume" in df.columns else df.get("volume")
+
+    # Calculate based on function type
+    if func_name == "sma":
+        result = ta_func(close, **kwargs)
+    elif func_name == "ema":
+        result = ta_func(close, **kwargs)
+    elif func_name == "rsi":
+        result = ta_func(close, **kwargs)
+    elif func_name == "macd":
+        macd_df = ta_func(close, **kwargs)
+        if macd_df is None:
+            return pd.Series([None] * len(df), index=df.index)
+        # Map to specific MACD column
+        if indicator == "macd":
+            result = macd_df.iloc[:, 0]  # MACD line
+        elif indicator == "macds":
+            result = macd_df.iloc[:, 2]  # Signal line
+        elif indicator == "macdh":
+            result = macd_df.iloc[:, 1]  # Histogram
+        else:
+            result = macd_df.iloc[:, 0]
+    elif func_name == "bbands":
+        bb_df = ta_func(close, **kwargs)
+        if bb_df is None:
+            return pd.Series([None] * len(df), index=df.index)
+        # Map to specific Bollinger Band column
+        if indicator == "boll":
+            result = bb_df.iloc[:, 1]  # Middle band
+        elif indicator == "boll_ub":
+            result = bb_df.iloc[:, 2]  # Upper band
+        elif indicator == "boll_lb":
+            result = bb_df.iloc[:, 0]  # Lower band
+        else:
+            result = bb_df.iloc[:, 1]
+    elif func_name == "atr":
+        if high is None or low is None:
+            raise ValueError("ATR requires High, Low, Close columns")
+        result = ta_func(high, low, close, **kwargs)
+    elif func_name == "vwma":
+        if volume is None:
+            raise ValueError("VWMA requires Volume column")
+        result = ta_func(close, volume, **kwargs)
+    elif func_name == "mfi":
+        if high is None or low is None or volume is None:
+            raise ValueError("MFI requires High, Low, Close, Volume columns")
+        result = ta_func(high, low, close, volume, **kwargs)
+    else:
+        # Generic fallback
+        result = ta_func(close, **kwargs)
+
+    return result
+
+
+def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate all supported indicators at once.
+
+    Args:
+        df: DataFrame with OHLCV data.
+
+    Returns:
+        DataFrame with all indicator columns added.
+    """
+    result_df = df.copy()
+
+    for indicator in INDICATOR_MAPPING:
+        try:
+            result_df[indicator] = calculate_indicator(df, indicator)
+        except Exception as e:
+            logger.warning("Failed to calculate %s: %s", indicator, e)
+            result_df[indicator] = None
+
+    return result_df
 
 
 class StockstatsUtils:
+    """Backward-compatible interface for technical indicator calculation."""
+
     @staticmethod
     def get_stock_stats(
         symbol: Annotated[str, "ticker symbol for the company"],
@@ -16,7 +154,17 @@ class StockstatsUtils:
         curr_date: Annotated[
             str, "curr date for retrieving stock price data, YYYY-mm-dd"
         ],
-    ):
+    ) -> str:
+        """Get a technical indicator value for a specific date.
+
+        Args:
+            symbol: Stock ticker symbol.
+            indicator: Indicator name (e.g., 'rsi', 'macd', 'close_50_sma').
+            curr_date: Date string in YYYY-mm-dd format.
+
+        Returns:
+            String representation of the indicator value or error message.
+        """
         config = get_config()
 
         today_date = pd.Timestamp.today()
@@ -35,6 +183,7 @@ class StockstatsUtils:
             f"{symbol}-YFin-data-{start_date_str}-{end_date_str}.csv",
         )
 
+        # Load or fetch data
         if os.path.exists(data_file):
             data = pd.read_csv(data_file)
             data["Date"] = pd.to_datetime(data["Date"])
@@ -50,15 +199,23 @@ class StockstatsUtils:
             data = data.reset_index()
             data.to_csv(data_file, index=False)
 
-        df = wrap(data)
-        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+        # Calculate indicator using pandas-ta
+        try:
+            data[indicator] = calculate_indicator(data, indicator)
+        except ValueError as e:
+            return f"Error: {e}"
+
+        # Format date column for matching
+        data["Date"] = data["Date"].dt.strftime("%Y-%m-%d")
         curr_date_str = curr_date_dt.strftime("%Y-%m-%d")
 
-        df[indicator]  # trigger stockstats to calculate the indicator
-        matching_rows = df[df["Date"].str.startswith(curr_date_str)]
+        # Find matching row
+        matching_rows = data[data["Date"].str.startswith(curr_date_str)]
 
         if not matching_rows.empty:
             indicator_value = matching_rows[indicator].values[0]
-            return indicator_value
+            if pd.isna(indicator_value):
+                return "N/A: Insufficient data for calculation"
+            return str(indicator_value)
         else:
             return "N/A: Not a trading day (weekend or holiday)"

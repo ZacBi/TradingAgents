@@ -54,22 +54,24 @@ dependencies = [
     "backtrader>=1.9.78.123",
     "chainlit>=2.5.5",
     "pandas>=2.3.0",
+    "pandas-ta>=0.3.14b",
     "parsel>=1.10.0",
     "pyyaml>=6.0",
     "pytz>=2025.2",
     "questionary>=2.1.0",
-    "rank-bm25>=0.2.2",
     "redis>=6.2.0",
     "requests>=2.32.4",
     "rich>=14.0.0",
     "typer>=0.21.0",
-    "stockstats>=0.6.5",
     "tqdm>=4.67.1",
     "typing-extensions>=4.14.0",
     "yfinance>=0.2.63",
     "langchain>=1.2.10",
     "pydantic>=2.12.5",
+    "pydantic-settings>=2.0.0",
     "python-dotenv>=1.2.1",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
 ]
 
 [project.urls]
@@ -87,14 +89,17 @@ observability = [
     "opentelemetry-sdk>=1.0.0",
 ]
 litellm = ["litellm>=1.0"]
-memory = ["chromadb>=0.5.0", "sentence-transformers>=3.0.0"]
+postgres = [
+    "psycopg[binary]>=3.1.0",
+    "pgvector>=0.3.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
+]
 data-sources = [
     "fredapi>=0.5.0",
     "finnhub-python>=2.4.0",
     "praw>=7.7.0",
     "longport>=1.0.0",
 ]
-indicators = ["ta>=0.11.0"]
 dashboard = ["streamlit>=1.28.0", "plotly>=5.0.0", "altair>=5.0.0"]
 api = ["fastapi>=0.104.0", "uvicorn>=0.24.0", "starlette>=0.27.0"]
 dev = [

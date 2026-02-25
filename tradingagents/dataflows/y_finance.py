@@ -190,13 +190,13 @@ def _get_stock_stats_bulk(
     curr_date: Annotated[str, "current date for reference"]
 ) -> dict:
     """
-    Optimized bulk calculation of stock stats indicators.
+    Optimized bulk calculation of stock stats indicators using pandas-ta.
     Fetches data once and calculates indicator for all available dates.
     Returns dict mapping date strings to indicator values.
     """
     from .config import get_config
+    from .stockstats_utils import calculate_indicator
     import pandas as pd
-    from stockstats import wrap
     import os
     
     config = get_config()
@@ -211,13 +211,12 @@ def _get_stock_stats_bulk(
                     f"{symbol}-YFin-data-2015-01-01-2025-03-25.csv",
                 )
             )
-            df = wrap(data)
+            data["Date"] = pd.to_datetime(data["Date"])
         except FileNotFoundError:
-            raise Exception("Stockstats fail: Yahoo Finance data not fetched yet!")
+            raise Exception("Data fetch failed: Yahoo Finance data not cached yet!")
     else:
         # Online data fetching with caching
         today_date = pd.Timestamp.today()
-        curr_date_dt = pd.to_datetime(curr_date)
         
         end_date = today_date
         start_date = today_date - pd.DateOffset(years=15)
@@ -245,16 +244,14 @@ def _get_stock_stats_bulk(
             )
             data = data.reset_index()
             data.to_csv(data_file, index=False)
-        
-        df = wrap(data)
-        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
     
-    # Calculate the indicator for all rows at once
-    df[indicator]  # This triggers stockstats to calculate the indicator
+    # Calculate indicator using pandas-ta
+    data[indicator] = calculate_indicator(data, indicator)
+    data["Date"] = data["Date"].dt.strftime("%Y-%m-%d")
     
     # Create a dictionary mapping date strings to indicator values
     result_dict = {}
-    for _, row in df.iterrows():
+    for _, row in data.iterrows():
         date_str = row["Date"]
         indicator_value = row[indicator]
         

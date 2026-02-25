@@ -50,8 +50,9 @@ DEFAULT_CONFIG = {
     "database_path": "tradingagents.db",
     # ----- Phase 0: LangGraph Checkpointing -----
     "checkpointing_enabled": True,
-    "checkpoint_storage": "memory",        # memory | sqlite (sqlite requires langgraph-checkpoint-sqlite)
+    "checkpoint_storage": "memory",        # memory | sqlite | postgres
     "checkpoint_db_path": "checkpoints.db",
+    "checkpoint_postgres_url": None,       # postgresql://user:pass@host/db
     # ----- Phase 2: Data Source API Keys -----
     "fred_api_key": None,                  # or set FRED_API_KEY env var
     "longport_app_key": None,              # or set LONGPORT_APP_KEY env var
@@ -92,5 +93,15 @@ DEFAULT_CONFIG = {
     "valuation_risk_free_rate": 0.04,      # Risk-free rate for WACC
     "valuation_market_risk_premium": 0.06, # Equity risk premium
     "valuation_graham_safety_threshold": 0.30,  # Graham margin of safety threshold
+    # ----- Phase 5: LangGraph Store (Memory System) -----
+    "store_enabled": True,                 # Enable LangGraph Store for memory
+    "store_backend": "memory",             # memory | postgres
+    "store_postgres_url": None,            # postgresql://user:pass@host/db (shared with checkpoint)
+    # Store Embedding configuration
+    "store_embedding_provider": "openai",  # openai | sentence_transformers
+    "store_embedding_model": "text-embedding-3-small",  # OpenAI embedding model
+    "store_embedding_dimension": 1536,     # Embedding vector dimension
+    # ----- Phase 5: PostgreSQL Unified Connection -----
+    "postgres_url": None,                  # Unified PostgreSQL URL for Store + Checkpoint + DB
 }
 

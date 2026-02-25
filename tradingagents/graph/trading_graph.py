@@ -13,7 +13,11 @@ from tradingagents.llm_clients import create_llm_client
 
 from tradingagents.agents import *
 from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.agents.utils.memory import FinancialSituationMemory
+from tradingagents.agents.utils.memory import (
+    FinancialSituationMemory,
+    create_memory_store,
+    create_embedder,
+)
 from tradingagents.agents.utils.agent_states import (
     AgentState,
     InvestDebateState,
@@ -125,12 +129,18 @@ class TradingAgentsGraph:
             self.deep_thinking_llm = deep_client.get_llm()
             self.quick_thinking_llm = quick_client.get_llm()
         
-        # Initialize memories
-        self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
-        self.bear_memory = FinancialSituationMemory("bear_memory", self.config)
-        self.trader_memory = FinancialSituationMemory("trader_memory", self.config)
-        self.invest_judge_memory = FinancialSituationMemory("invest_judge_memory", self.config)
-        self.risk_manager_memory = FinancialSituationMemory("risk_manager_memory", self.config)
+        # --- Phase 5: Initialize LangGraph Store for memory ---
+        self.store = None
+        self.embedder = None
+        if self.config.get("store_enabled", True):
+            self._init_store()
+
+        # Initialize memories with store and embedder
+        self.bull_memory = FinancialSituationMemory("bull", self.store, self.embedder)
+        self.bear_memory = FinancialSituationMemory("bear", self.store, self.embedder)
+        self.trader_memory = FinancialSituationMemory("trader", self.store, self.embedder)
+        self.invest_judge_memory = FinancialSituationMemory("invest_judge", self.store, self.embedder)
+        self.risk_manager_memory = FinancialSituationMemory("risk_manager", self.store, self.embedder)
 
         # Create tool nodes
         self.tool_nodes = self._create_tool_nodes()
@@ -235,6 +245,20 @@ class TradingAgentsGraph:
             logger.warning("Database init failed: %s", exc)
             self.db = None
 
+    def _init_store(self):
+        """Initialize LangGraph Store for semantic memory retrieval."""
+        try:
+            self.store = create_memory_store(self.config)
+            if self.store:
+                self.embedder = create_embedder(self.config)
+                logger.info("LangGraph Store initialized with embedder.")
+            else:
+                logger.info("LangGraph Store disabled or failed to initialize.")
+        except Exception as exc:
+            logger.warning("Store init failed: %s", exc)
+            self.store = None
+            self.embedder = None
+
     def _init_checkpointer(self):
         """Initialize LangGraph checkpointer based on config."""
         try:
@@ -248,12 +272,21 @@ class TradingAgentsGraph:
                 db_path = self.config.get("checkpoint_db_path", "checkpoints.db")
                 self.checkpointer = SqliteSaver.from_conn_string(db_path)
                 logger.info("LangGraph SQLite checkpointer at %s", db_path)
+            elif storage == "postgres":
+                from langgraph.checkpoint.postgres import PostgresSaver
+                pg_url = self.config.get("postgres_url") or self.config.get("checkpoint_postgres_url")
+                if not pg_url:
+                    logger.error("PostgreSQL URL not configured for checkpointer.")
+                    self.checkpointer = None
+                    return
+                self.checkpointer = PostgresSaver.from_conn_string(pg_url)
+                logger.info("LangGraph PostgresSaver checkpointer initialized.")
             else:
                 logger.warning("Unknown checkpoint_storage: %s", storage)
         except ImportError as exc:
             logger.warning(
                 "Checkpointer init failed (missing package?): %s. "
-                "For sqlite storage, install langgraph-checkpoint-sqlite.", exc
+                "For postgres storage, install langgraph-checkpoint-postgres.", exc
             )
             self.checkpointer = None
         except Exception as exc:
