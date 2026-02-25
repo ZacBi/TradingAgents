@@ -853,16 +853,16 @@ flowchart LR
 - [x] 财报跟踪Agent
 
 ### 阶段4: 价值投资框架
-- [ ] DCF估值模型
-- [ ] 护城河评估模块
-- [ ] 安全边际计算
-- [ ] 价值投资决策流程集成
+- [x] DCF估值模型
+- [x] 护城河评估模块
+- [x] 安全边际计算
+- [x] 价值投资决策流程集成
 
 ### 阶段5: 优化与测试
-- [ ] Token成本优化验证
-- [ ] 回测框架
-- [ ] 端到端测试
-- [ ] Streamlit Dashboard（可选）
+- [x] Token成本优化验证
+- [x] 回测框架
+- [x] 端到端测试
+- [x] Streamlit Dashboard（可选）
 
 ---
 
@@ -924,6 +924,13 @@ flowchart LR
 - **成本追踪**: 在Langfuse中验证Token消耗统计
 - **Prompt改进验证**: 对比改进前后的决策准确率和Sharpe Ratio
 - **记忆系统验证**: 验证持久化后重启不丢失，检索相关性评分
+
+### 阶段5 验证说明
+
+- **Token 成本验证**: 运行一次 CLI 分析后，在「Analysis Complete」下方会打印 Run statistics（LLM calls, Tool calls, Tokens in/out, Estimated cost USD）。可选：在 Langfuse 中按 `agent_decisions.langfuse_trace_id` 查看真实用量与成本。
+- **回测**: 使用 `uv run python -m cli.main backtest --ticker AAPL --start 2024-01-01 --end 2024-12-31 [--db-path tradingagents.db]` 或 `--csv decisions.csv`（CSV 列：ticker, trade_date, final_decision）。输出总收益、年化、夏普、最大回撤、胜率等。
+- **端到端测试**: 执行 `uv run pytest tests/e2e/ -v`。使用 mock LLM（FakeListChatModel），无需真实 API；安装 `uv sync --extra testing` 以包含 langchain-community。
+- **Streamlit Dashboard**: 安装 `uv sync --extra dashboard` 后执行 `uv run streamlit run dashboard/app.py`，可查看决策列表、NAV 曲线及说明。
 
 ---
 

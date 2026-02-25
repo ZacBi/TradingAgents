@@ -200,6 +200,16 @@ print(decision)
 
 See `tradingagents/default_config.py` for all configuration options.
 
+### Optional: Backtest and Dashboard
+
+- **Backtest**: Run a backtest from persisted decisions (SQLite or CSV):  
+  `python -m cli.main backtest --ticker AAPL --start 2024-01-01 --end 2024-12-31`  
+  Use `--db-path` for the SQLite DB or `--csv path/to/decisions.csv` (columns: ticker, trade_date, final_decision).
+
+- **Streamlit Dashboard**: Install with `uv sync --extra dashboard` (or pip install streamlit plotly altair), then:  
+  `uv run streamlit run dashboard/app.py`  
+  View agent decisions, daily NAV curve, and run statistics.
+
 ## Contributing
 
 We welcome contributions from the community! Whether it's fixing a bug, improving documentation, or suggesting a new feature, your input helps make this project better. If you are interested in this line of research, please consider joining our open-source financial AI research community [Tauric Research](https://tauric.ai/).

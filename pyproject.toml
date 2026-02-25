@@ -116,6 +116,7 @@ testing = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "hypothesis>=6.0.0",
+    "langchain-community>=0.3.0",
 ]
 docs = [
     "mkdocs>=1.5.0",

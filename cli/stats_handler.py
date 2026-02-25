@@ -1,5 +1,5 @@
 import threading
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
@@ -65,12 +65,20 @@ class StatsCallbackHandler(BaseCallbackHandler):
         with self._lock:
             self.tool_calls += 1
 
-    def get_stats(self) -> Dict[str, Any]:
-        """Return current statistics."""
+    def get_stats(self, model_name: Optional[str] = None) -> Dict[str, Any]:
+        """Return current statistics including estimated cost (USD)."""
         with self._lock:
+            try:
+                from tradingagents.observability.cost_estimator import estimate_cost
+                estimated_cost_usd = estimate_cost(
+                    self.tokens_in, self.tokens_out, model_name=model_name
+                )
+            except Exception:
+                estimated_cost_usd = None
             return {
                 "llm_calls": self.llm_calls,
                 "tool_calls": self.tool_calls,
                 "tokens_in": self.tokens_in,
                 "tokens_out": self.tokens_out,
+                "estimated_cost_usd": estimated_cost_usd,
             }

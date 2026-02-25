@@ -122,6 +122,26 @@ class DatabaseManager:
             query = query.order_by(AgentDecision.created_at.desc()).limit(limit)
             return [self._model_to_dict(row) for row in query.all()]
 
+    def get_decisions_in_range(
+        self,
+        ticker: str,
+        start_date: str,
+        end_date: str,
+    ) -> List[dict]:
+        """Retrieve decisions for a ticker within a date range (inclusive).
+
+        start_date and end_date should be YYYY-MM-DD. Used for backtesting.
+        """
+        with self.session_scope() as session:
+            query = (
+                session.query(AgentDecision)
+                .filter(AgentDecision.ticker == ticker)
+                .filter(AgentDecision.trade_date >= start_date)
+                .filter(AgentDecision.trade_date <= end_date)
+                .order_by(AgentDecision.trade_date.asc())
+            )
+            return [self._model_to_dict(row) for row in query.all()]
+
     # ------------------------------------------------------------------
     # trades
     # ------------------------------------------------------------------
@@ -201,6 +221,17 @@ class DatabaseManager:
                     cumulative_return=nav.get("cumulative_return", 0),
                 )
                 session.add(obj)
+
+    def get_daily_nav(self, limit: int = 365) -> List[dict]:
+        """Retrieve daily NAV records, most recent first, for dashboard/charts."""
+        with self.session_scope() as session:
+            rows = (
+                session.query(DailyNav)
+                .order_by(DailyNav.date.desc())
+                .limit(limit)
+                .all()
+            )
+            return [self._model_to_dict(r) for r in reversed(rows)]
 
     # ------------------------------------------------------------------
     # Raw data archive helpers

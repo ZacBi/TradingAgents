@@ -4542,6 +4542,7 @@ postgres = [
 ]
 testing = [
     { name = "hypothesis" },
+    { name = "langchain-community" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -4569,6 +4570,7 @@ requires-dist = [
     { name = "hypothesis", marker = "extra == 'testing'", specifier = ">=6.0.0" },
     { name = "langchain", specifier = ">=1.2.10" },
     { name = "langchain-anthropic", specifier = ">=0.3.15" },
+    { name = "langchain-community", marker = "extra == 'testing'", specifier = ">=0.3.0" },
     { name = "langchain-core", specifier = ">=0.3.83" },
     { name = "langchain-experimental", specifier = ">=0.3.4" },
     { name = "langchain-google-genai", specifier = ">=2.1.5" },

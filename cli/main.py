@@ -1144,6 +1144,21 @@ def run_analysis():
     # Post-analysis prompts (outside Live context for clean interaction)
     console.print("\n[bold cyan]Analysis Complete![/bold cyan]\n")
 
+    # Token and cost summary
+    run_stats = stats_handler.get_stats()
+    stats_table = Table(title="Run statistics")
+    stats_table.add_column("Metric", style="cyan")
+    stats_table.add_column("Value", style="green")
+    stats_table.add_row("LLM calls", str(run_stats["llm_calls"]))
+    stats_table.add_row("Tool calls", str(run_stats["tool_calls"]))
+    stats_table.add_row("Tokens in", str(run_stats["tokens_in"]))
+    stats_table.add_row("Tokens out", str(run_stats["tokens_out"]))
+    cost_val = run_stats.get("estimated_cost_usd")
+    if cost_val is not None:
+        stats_table.add_row("Estimated cost (USD)", f"${cost_val:.4f}")
+    console.print(stats_table)
+    console.print()
+
     # Prompt to save report
     save_choice = typer.prompt("Save report?", default="Y").strip().upper()
     if save_choice in ("Y", "YES", ""):
@@ -1170,6 +1185,54 @@ def run_analysis():
 @app.command()
 def analyze():
     run_analysis()
+
+
+@app.command()
+def backtest(
+    ticker: str = typer.Option(..., "--ticker", "-t", help="Ticker symbol (e.g. AAPL)"),
+    start: str = typer.Option(..., "--start", "-s", help="Start date YYYY-MM-DD"),
+    end: str = typer.Option(..., "--end", "-e", help="End date YYYY-MM-DD"),
+    db_path: Optional[str] = typer.Option(
+        None, "--db-path", help="SQLite DB path for agent_decisions (default from config)"
+    ),
+    csv_path: Optional[str] = typer.Option(
+        None, "--csv", help="CSV file with columns: ticker, trade_date, final_decision"
+    ),
+    allocation: float = typer.Option(1.0, "--allocation", "-a", help="Fraction of cash per trade (0-1)"),
+):
+    """Run backtest from agent decisions (DB or CSV) and print metrics."""
+    if not db_path and not csv_path:
+        db_path = DEFAULT_CONFIG.get("database_path", "tradingagents.db")
+    try:
+        from tradingagents.backtest import run_backtest
+
+        metrics = run_backtest(
+            ticker=ticker,
+            start_date=start,
+            end_date=end,
+            decisions_from_db=db_path if db_path and not csv_path else None,
+            decisions_from_csv=csv_path,
+            allocation=allocation,
+        )
+    except Exception as e:
+        console.print(f"[red]Backtest failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    table = Table(title="Backtest results")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_row("Total return", f"{metrics['total_return']:.2%}")
+    table.add_row("Annual return", f"{metrics['annual_return']:.2%}")
+    if metrics.get("sharpe_ratio") is not None:
+        table.add_row("Sharpe ratio", f"{metrics['sharpe_ratio']:.4f}")
+    if metrics.get("max_drawdown_pct") is not None:
+        table.add_row("Max drawdown", f"{metrics['max_drawdown_pct']:.2%}")
+    if metrics.get("win_rate") is not None:
+        table.add_row("Win rate", f"{metrics['win_rate']:.2%}")
+    table.add_row("Num trades", str(metrics["num_trades"]))
+    table.add_row("Bars", str(metrics["num_bars"]))
+    table.add_row("End value", f"${metrics['end_value']:.2f}")
+    console.print(table)
 
 
 if __name__ == "__main__":

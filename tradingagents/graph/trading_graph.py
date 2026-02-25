@@ -108,7 +108,11 @@ class TradingAgentsGraph:
         if self.callbacks:
             llm_kwargs["callbacks"] = self.callbacks
 
-        if self._model_routing:
+        # Optional overrides for testing (e.g. FakeListChatModel in E2E)
+        if self.config.get("quick_think_llm_override") is not None:
+            self.quick_thinking_llm = self.config["quick_think_llm_override"]
+            self.deep_thinking_llm = self.config.get("deep_think_llm_override") or self.quick_thinking_llm
+        elif self._model_routing:
             # Per-role model creation via model routing
             self.deep_thinking_llm = self._create_routed_llm("judge", llm_kwargs)
             self.quick_thinking_llm = self._create_routed_llm("data_analyst", llm_kwargs)
@@ -145,6 +149,11 @@ class TradingAgentsGraph:
         # Create tool nodes
         self.tool_nodes = self._create_tool_nodes()
 
+        # --- Phase 0: LangGraph Checkpointing (before GraphSetup) ---
+        self.checkpointer = None
+        if self.config.get("checkpointing_enabled"):
+            self._init_checkpointer()
+
         # Initialize components
         self.conditional_logic = ConditionalLogic(
             max_debate_rounds=self.config.get("max_debate_rounds", 1),
@@ -179,11 +188,6 @@ class TradingAgentsGraph:
         self.db = None
         if self.config.get("database_enabled"):
             self._init_database()
-
-        # --- Phase 0: LangGraph Checkpointing ---
-        self.checkpointer = None
-        if self.config.get("checkpointing_enabled"):
-            self._init_checkpointer()
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
