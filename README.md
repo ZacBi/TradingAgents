@@ -1,5 +1,7 @@
 <p align="center">
   <img src="assets/TauricResearch.png" style="width: 60%; height: auto;">
+  <br>
+  <em>Fork maintained by <strong>Zac Bi</strong></em>
 </p>
 
 <div align="center" style="line-height: 1;">
