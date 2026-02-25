@@ -6,6 +6,7 @@ import os
 from typing import Optional
 
 from .gemini import DeepResearchResult
+from tradingagents.prompts import PromptNames, get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ class OpenAIDeepResearchProvider:
             raise ValueError("OpenAI API key is required")
         
         self._client = OpenAI(api_key=api_key)
+        self.pm = get_prompt_manager()
         
         logger.info("Initialized OpenAI Deep Research with model=%s", model_name)
 
@@ -78,11 +80,7 @@ class OpenAIDeepResearchProvider:
                 messages=[
                     {
                         "role": "system",
-                        "content": (
-                            "You are a professional financial research analyst. "
-                            "Provide comprehensive, well-structured research reports "
-                            "based on your knowledge. Be specific with data and dates."
-                        )
+                        "content": self.pm.get_prompt(PromptNames.RESEARCH_OPENAI_SYSTEM)
                     },
                     {"role": "user", "content": full_prompt}
                 ],

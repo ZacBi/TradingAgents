@@ -6,6 +6,8 @@ from datetime import date, datetime, timedelta
 from dataclasses import dataclass
 from typing import Optional, Callable
 
+from tradingagents.prompts import PromptNames, get_prompt_manager
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,6 +56,7 @@ class EarningsTracker:
         self.enabled = config.get("earnings_tracking_enabled", True)
         self.lookahead_days = config.get("earnings_lookahead_days", 14)
         self.imminent_days = config.get("earnings_imminent_days", 3)
+        self.pm = get_prompt_manager()
         
         logger.info(
             "EarningsTracker initialized: enabled=%s, lookahead=%d days",
@@ -209,18 +212,14 @@ class EarningsTracker:
         
         if llm:
             try:
-                prompt = f"""Generate a brief pre-earnings analysis for {ticker}.
-                
-Earnings Date: {earnings_date}
-Days Until Earnings: {days_until}
-
-Focus on:
-1. What to watch in the earnings report
-2. Key metrics and expectations
-3. Potential catalysts or risks
-4. Historical earnings performance patterns
-
-Keep the analysis concise (3-4 paragraphs)."""
+                prompt = self.pm.get_prompt(
+                    PromptNames.SPECIALIST_EARNINGS_PRE_ANALYSIS,
+                    variables={
+                        "ticker": ticker,
+                        "earnings_date": str(earnings_date),
+                        "days_until": str(days_until),
+                    }
+                )
                 
                 response = llm.invoke(prompt)
                 report_parts.extend([

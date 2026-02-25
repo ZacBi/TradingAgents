@@ -2,6 +2,8 @@
 
 from langchain_openai import ChatOpenAI
 
+from tradingagents.prompts import PromptNames, get_prompt_manager
+
 
 class SignalProcessor:
     """Processes trading signals to extract actionable decisions."""
@@ -9,6 +11,7 @@ class SignalProcessor:
     def __init__(self, quick_thinking_llm: ChatOpenAI):
         """Initialize with an LLM for processing."""
         self.quick_thinking_llm = quick_thinking_llm
+        self.pm = get_prompt_manager()
 
     def process_signal(self, full_signal: str) -> str:
         """
@@ -20,11 +23,9 @@ class SignalProcessor:
         Returns:
             Extracted decision (BUY, SELL, or HOLD)
         """
+        system_prompt = self.pm.get_prompt(PromptNames.GRAPH_SIGNAL_EXTRACTION)
         messages = [
-            (
-                "system",
-                "You are an efficient assistant designed to analyze paragraphs or financial reports provided by a group of analysts. Your task is to extract the investment decision: SELL, BUY, or HOLD. Provide only the extracted decision (SELL, BUY, or HOLD) as your output, without adding any additional text or information.",
-            ),
+            ("system", system_prompt),
             ("human", full_signal),
         ]
 

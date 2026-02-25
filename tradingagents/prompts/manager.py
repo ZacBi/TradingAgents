@@ -132,6 +132,40 @@ class PromptManager:
             logger.warning("Missing variable %s for prompt %s, using partial format", e, name)
             return template.format_map(SafeDict(variables))
     
+    def get_prompt_parts(
+        self,
+        name: str,
+        variables: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, str]:
+        """获取 YAML 中所有模板部分并填充变量.
+        
+        用于需要多字段模板的场景(如 Analyst 的 system_template + template,
+        Trader 的 system_template + user_template)。
+        
+        Args:
+            name: Prompt 名称
+            variables: 模板变量字典
+            
+        Returns:
+            Dict, 例如 {"template": "...", "system_template": "...", "user_template": "..."}
+            
+        Raises:
+            KeyError: 如果 prompt 未找到
+        """
+        data = self._get_fallback_data(name)
+        if data is None:
+            raise KeyError(f"Prompt '{name}' not found")
+        
+        variables = variables or {}
+        result = {}
+        for key in ("template", "system_template", "user_template"):
+            if key in data and data[key]:
+                try:
+                    result[key] = data[key].format(**variables)
+                except KeyError:
+                    result[key] = data[key].format_map(SafeDict(variables))
+        return result
+
     def _get_template(self, name: str, version: Optional[str] = None) -> str:
         """Get raw template string (before variable substitution).
         
@@ -211,8 +245,8 @@ class PromptManager:
             logger.debug("Failed to fetch prompt '%s' from Langfuse: %s", name, exc)
             return None
     
-    def _get_fallback(self, name: str) -> Optional[str]:
-        """从 YAML 文件加载 fallback 模板."""
+    def _get_fallback_data(self, name: str) -> Optional[Dict[str, Any]]:
+        """从 YAML 文件加载完整模板数据(含所有字段)."""
         rel_path = TEMPLATE_PATH_MAP.get(name)
         if rel_path is None:
             logger.warning("No YAML template mapping for prompt '%s'", name)
@@ -220,14 +254,20 @@ class PromptManager:
         yaml_path = _TEMPLATES_DIR / rel_path
         try:
             with open(yaml_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-            return data.get("template")
+                return yaml.safe_load(f)
         except FileNotFoundError:
             logger.warning("YAML template file not found: %s", yaml_path)
             return None
         except Exception as exc:
             logger.warning("Failed to load YAML template '%s': %s", yaml_path, exc)
             return None
+
+    def _get_fallback(self, name: str) -> Optional[str]:
+        """从 YAML 文件加载 fallback 模板(仅 template 字段)."""
+        data = self._get_fallback_data(name)
+        if data is None:
+            return None
+        return data.get("template")
     
     def clear_cache(self) -> None:
         """Clear all cached prompts."""

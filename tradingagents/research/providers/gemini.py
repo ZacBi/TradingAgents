@@ -6,6 +6,8 @@ import os
 from typing import Optional
 from dataclasses import dataclass
 
+from tradingagents.prompts import PromptNames, get_prompt_manager
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -66,6 +68,7 @@ class GeminiDeepResearchProvider:
             # Enable grounding with Google Search
             tools="google_search_retrieval",
         )
+        self.pm = get_prompt_manager()
         
         logger.info("Initialized Gemini Deep Research with model=%s", model_name)
 
@@ -133,47 +136,14 @@ class GeminiDeepResearchProvider:
         context: Optional[str],
     ) -> str:
         """Build a comprehensive research prompt."""
-        prompt_parts = [
-            "You are a professional financial research analyst conducting deep research.",
-            "Your task is to provide a comprehensive, well-sourced analysis.",
-            "",
-            "## Research Query",
-            query,
-        ]
-        
-        if ticker:
-            prompt_parts.extend([
-                "",
-                f"## Stock of Interest: {ticker}",
-            ])
-        
-        if context:
-            prompt_parts.extend([
-                "",
-                "## Additional Context",
-                context,
-            ])
-        
-        prompt_parts.extend([
-            "",
-            "## Instructions",
-            "1. Search for the most recent and relevant information",
-            "2. Analyze multiple sources for a balanced view",
-            "3. Focus on factual, verifiable information",
-            "4. Include specific data points, numbers, and dates where available",
-            "5. Identify any conflicting information and note the discrepancies",
-            "6. Structure your report clearly with sections",
-            "",
-            "## Output Format",
-            "Provide a detailed research report with:",
-            "- Executive Summary",
-            "- Key Findings",
-            "- Detailed Analysis",
-            "- Risk Factors",
-            "- Conclusion and Outlook",
-        ])
-        
-        return "\n".join(prompt_parts)
+        ticker_section = f"\n\n## Stock of Interest: {ticker}" if ticker else ""
+        context_section = f"\n\n## Additional Context\n{context}" if context else ""
+
+        return self.pm.get_prompt(PromptNames.RESEARCH_GEMINI, variables={
+            "query": query,
+            "ticker_section": ticker_section,
+            "context_section": context_section,
+        })
 
 
 def create_gemini_provider(config: dict) -> Optional[GeminiDeepResearchProvider]:

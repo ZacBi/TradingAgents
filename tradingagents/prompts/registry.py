@@ -41,6 +41,17 @@ class PromptNames:
     # Valuation Prompt (1)
     VALUATION_MOAT = "valuation-moat"
 
+    # Graph Prompts (2)
+    GRAPH_REFLECTION = "graph-reflection"
+    GRAPH_SIGNAL_EXTRACTION = "graph-signal-extraction"
+
+    # Research Prompts (2)
+    RESEARCH_OPENAI_SYSTEM = "research-openai-system"
+    RESEARCH_GEMINI = "research-gemini"
+
+    # Specialist Prompts (1)
+    SPECIALIST_EARNINGS_PRE_ANALYSIS = "specialist-earnings-pre-analysis"
+
 
 # Langfuse label mapping (for organization in UI)
 PROMPT_LABELS = {
@@ -62,6 +73,11 @@ PROMPT_LABELS = {
     PromptNames.RISK_NEUTRAL: "risk/neutral",
     PromptNames.TRADER_MAIN: "trader/main",
     PromptNames.VALUATION_MOAT: "valuation/moat",
+    PromptNames.GRAPH_REFLECTION: "graph/reflection",
+    PromptNames.GRAPH_SIGNAL_EXTRACTION: "graph/signal_extraction",
+    PromptNames.RESEARCH_OPENAI_SYSTEM: "research/openai_system",
+    PromptNames.RESEARCH_GEMINI: "research/gemini",
+    PromptNames.SPECIALIST_EARNINGS_PRE_ANALYSIS: "specialist/earnings_pre_analysis",
 }
 
 # All prompt names as a list (for iteration)
@@ -84,6 +100,11 @@ ALL_PROMPT_NAMES = [
     PromptNames.RISK_NEUTRAL,
     PromptNames.TRADER_MAIN,
     PromptNames.VALUATION_MOAT,
+    PromptNames.GRAPH_REFLECTION,
+    PromptNames.GRAPH_SIGNAL_EXTRACTION,
+    PromptNames.RESEARCH_OPENAI_SYSTEM,
+    PromptNames.RESEARCH_GEMINI,
+    PromptNames.SPECIALIST_EARNINGS_PRE_ANALYSIS,
 ]
 
 # PromptName → YAML 文件相对路径映射 (相对于 templates/ 目录)
@@ -106,4 +127,9 @@ TEMPLATE_PATH_MAP = {
     PromptNames.RISK_NEUTRAL: "risk/neutral.yaml",
     PromptNames.TRADER_MAIN: "trader/main.yaml",
     PromptNames.VALUATION_MOAT: "valuation/moat.yaml",
+    PromptNames.GRAPH_REFLECTION: "graph/reflection.yaml",
+    PromptNames.GRAPH_SIGNAL_EXTRACTION: "graph/signal_extraction.yaml",
+    PromptNames.RESEARCH_OPENAI_SYSTEM: "research/openai_system.yaml",
+    PromptNames.RESEARCH_GEMINI: "research/gemini_research.yaml",
+    PromptNames.SPECIALIST_EARNINGS_PRE_ANALYSIS: "specialists/earnings_pre_analysis.yaml",
 }
