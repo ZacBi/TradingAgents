@@ -3,7 +3,6 @@
 Decision on date D is executed at the open of the next bar (D+1).
 """
 
-from typing import Dict
 
 import backtrader as bt
 
@@ -33,7 +32,7 @@ class AgentDecisionStrategy(bt.Strategy):
         except Exception:
             return
 
-        decisions: Dict[str, str] = self.p.decisions
+        decisions: dict[str, str] = self.p.decisions
         decision = (decisions or {}).get(self._prev_bar_date, "HOLD")
         decision = (decision or "").strip().upper()
         if decision not in ("BUY", "SELL", "HOLD"):

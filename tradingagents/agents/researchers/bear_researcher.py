@@ -1,6 +1,3 @@
-from langchain_core.messages import AIMessage
-import time
-import json
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
 
@@ -23,7 +20,7 @@ def create_bear_researcher(llm, memory):
         past_memories = memory.get_memories(curr_situation, n_matches=2)
 
         past_memory_str = ""
-        for i, rec in enumerate(past_memories, 1):
+        for _i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
         prompt = pm.get_prompt(PromptNames.RESEARCHER_BEAR, variables={

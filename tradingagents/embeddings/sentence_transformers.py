@@ -2,7 +2,6 @@
 """Sentence Transformers embedding provider (local, no API cost)."""
 
 import logging
-from typing import Optional
 
 from .base import EmbeddingProvider
 
@@ -23,7 +22,7 @@ except ImportError:
 class SentenceTransformersProvider(EmbeddingProvider):
     """
     Local embedding provider using Sentence Transformers.
-    
+
     Default model: all-MiniLM-L6-v2 (fast, 384 dimensions)
     Alternative: all-mpnet-base-v2 (better quality, 768 dimensions)
     """
@@ -31,11 +30,11 @@ class SentenceTransformersProvider(EmbeddingProvider):
     def __init__(
         self,
         model_name: str = "all-MiniLM-L6-v2",
-        device: Optional[str] = None,
+        device: str | None = None,
     ):
         """
         Initialize the Sentence Transformers provider.
-        
+
         Args:
             model_name: Name of the sentence-transformers model
             device: Device to run on ('cpu', 'cuda', 'mps', or None for auto)
@@ -45,11 +44,11 @@ class SentenceTransformersProvider(EmbeddingProvider):
                 "sentence-transformers is required. "
                 "Install with: pip install sentence-transformers"
             )
-        
+
         self._model_name = model_name
         self._model = SentenceTransformer(model_name, device=device)
         self._dimension = self._model.get_sentence_embedding_dimension()
-        
+
         logger.info(
             "Initialized SentenceTransformers with model=%s, dim=%d",
             model_name, self._dimension
@@ -84,19 +83,19 @@ class SentenceTransformersProvider(EmbeddingProvider):
 
 def create_sentence_transformers_provider(
     config: dict,
-) -> Optional[SentenceTransformersProvider]:
+) -> SentenceTransformersProvider | None:
     """
     Factory function to create a SentenceTransformers provider.
-    
+
     Args:
         config: Configuration dictionary with optional keys:
             - embedding_model: Model name (default: all-MiniLM-L6-v2)
-            
+
     Returns:
         Provider instance or None if not available
     """
     if not SENTENCE_TRANSFORMERS_AVAILABLE:
         return None
-    
+
     model_name = config.get("embedding_model", "all-MiniLM-L6-v2")
     return SentenceTransformersProvider(model_name=model_name)

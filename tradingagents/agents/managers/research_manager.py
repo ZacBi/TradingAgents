@@ -1,7 +1,8 @@
-import time
-import json
+import logging
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
+
+logger = logging.getLogger(__name__)
 
 
 def create_research_manager(llm, memory):
@@ -20,27 +21,32 @@ def create_research_manager(llm, memory):
         past_memories = memory.get_memories(curr_situation, n_matches=2)
 
         past_memory_str = ""
-        for i, rec in enumerate(past_memories, 1):
+        for _i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
         prompt = pm.get_prompt(PromptNames.MANAGER_RESEARCH, variables={
             "history": history,
             "past_memory_str": past_memory_str,
         })
-        response = llm.invoke(prompt)
+        try:
+            response = llm.invoke(prompt)
+            content = response.content
+        except Exception as e:
+            logger.exception("Research Manager LLM invoke failed")
+            content = f"Error during research synthesis; defaulting to HOLD. Reason: {e}"
 
         new_investment_debate_state = {
-            "judge_decision": response.content,
+            "judge_decision": content,
             "history": investment_debate_state.get("history", ""),
             "bear_history": investment_debate_state.get("bear_history", ""),
             "bull_history": investment_debate_state.get("bull_history", ""),
-            "current_response": response.content,
+            "current_response": content,
             "count": investment_debate_state["count"],
         }
 
         return {
             "investment_debate_state": new_investment_debate_state,
-            "investment_plan": response.content,
+            "investment_plan": content,
         }
 
     return research_manager_node

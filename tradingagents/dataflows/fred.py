@@ -30,28 +30,28 @@ _fred_client: Optional["Fred"] = None
 def _get_fred_client() -> "Fred":
     """Get or create a cached Fred client instance."""
     global _fred_client
-    
+
     if not FRED_AVAILABLE:
         raise ImportError(
             "fredapi package not installed. "
             "Install with: uv pip install fredapi"
         )
-    
+
     if _fred_client is None:
         # Try environment variable first, then config
         api_key = os.getenv("FRED_API_KEY")
         if not api_key:
             from .config import get_config
             api_key = get_config().get("fred_api_key")
-        
+
         if not api_key:
             raise ValueError(
                 "FRED API key not configured. "
                 "Set FRED_API_KEY environment variable or config['fred_api_key']"
             )
-        
+
         _fred_client = Fred(api_key=api_key)
-    
+
     return _fred_client
 
 
@@ -90,14 +90,14 @@ def get_fred_series(
             "Error: fredapi package not installed. "
             "Install with: uv pip install fredapi"
         )
-    
+
     try:
         fred = _get_fred_client()
         data = fred.get_series(series_id, start_date, end_date)
-        
+
         if data is None or data.empty:
             return f"No data found for series '{series_id}' between {start_date} and {end_date}"
-        
+
         # Get series info for description
         try:
             info = fred.get_series_info(series_id)
@@ -108,14 +108,14 @@ def get_fred_series(
             title = series_id
             units = ""
             frequency = ""
-        
+
         # Convert to DataFrame for CSV export
         import pandas as pd
         df = pd.DataFrame({"Date": data.index, "Value": data.values})
         df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
-        
+
         csv_string = df.to_csv(index=False)
-        
+
         header = f"# {title}\n"
         header += f"# Series ID: {series_id}\n"
         if units:
@@ -125,9 +125,9 @@ def get_fred_series(
         header += f"# Date range: {start_date} to {end_date}\n"
         header += f"# Total records: {len(df)}\n"
         header += f"# Retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        
+
         return header + csv_string
-    
+
     except Exception as e:
         return f"Error retrieving FRED series {series_id}: {str(e)}"
 
@@ -195,7 +195,7 @@ def get_interest_rate(
     if rate_type not in SERIES_IDS:
         available = ["federal_funds", "treasury_10y", "treasury_2y", "treasury_3m"]
         return f"Error: Invalid rate_type '{rate_type}'. Available options: {available}"
-    
+
     return get_fred_series(SERIES_IDS[rate_type], start_date, end_date)
 
 

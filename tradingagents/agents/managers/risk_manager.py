@@ -1,16 +1,14 @@
-import time
-import json
+import logging
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
+
+logger = logging.getLogger(__name__)
 
 
 def create_risk_manager(llm, memory):
     pm = get_prompt_manager()
 
     def risk_manager_node(state) -> dict:
-
-        company_name = state["company_of_interest"]
-
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
         market_research_report = state["market_report"]
@@ -23,7 +21,7 @@ def create_risk_manager(llm, memory):
         past_memories = memory.get_memories(curr_situation, n_matches=2)
 
         past_memory_str = ""
-        for i, rec in enumerate(past_memories, 1):
+        for _i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
         prompt = pm.get_prompt(PromptNames.MANAGER_RISK, variables={
@@ -32,10 +30,15 @@ def create_risk_manager(llm, memory):
             "history": history,
         })
 
-        response = llm.invoke(prompt)
+        try:
+            response = llm.invoke(prompt)
+            content = response.content
+        except Exception as e:
+            logger.exception("Risk Manager LLM invoke failed")
+            content = f"HOLD. Error during risk synthesis: {e}"
 
         new_risk_debate_state = {
-            "judge_decision": response.content,
+            "judge_decision": content,
             "history": risk_debate_state["history"],
             "aggressive_history": risk_debate_state["aggressive_history"],
             "conservative_history": risk_debate_state["conservative_history"],
@@ -49,7 +52,7 @@ def create_risk_manager(llm, memory):
 
         return {
             "risk_debate_state": new_risk_debate_state,
-            "final_trade_decision": response.content,
+            "final_trade_decision": content,
         }
 
     return risk_manager_node

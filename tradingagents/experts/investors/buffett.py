@@ -3,30 +3,30 @@
 
 import json
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
-from tradingagents.experts.base import ExpertProfile, ExpertOutput, EXPERT_OUTPUT_SCHEMA
+from tradingagents.experts.base import EXPERT_OUTPUT_SCHEMA, ExpertOutput, ExpertProfile
 from tradingagents.experts.registry import register_expert
 from tradingagents.prompts import PromptNames, get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
 
-def create_buffett_agent(llm, memory, prompt_manager: Optional[object] = None) -> Callable:
+def create_buffett_agent(llm, memory, prompt_manager: object | None = None) -> Callable:
     """
     Factory function to create a Warren Buffett expert agent node.
-    
+
     Args:
         llm: Language model instance
         memory: FinancialSituationMemory instance for this expert
         prompt_manager: Optional PromptManager instance for centralized prompts
-        
+
     Returns:
         A node function for the LangGraph
     """
     # Use provided prompt_manager or get global instance
     pm = prompt_manager or get_prompt_manager()
-    
+
     def buffett_node(state: dict) -> dict:
         """Buffett expert node that evaluates the stock."""
         # Extract analyst reports from state
@@ -34,20 +34,20 @@ def create_buffett_agent(llm, memory, prompt_manager: Optional[object] = None) -
         sentiment_report = state.get("sentiment_report", "Not available")
         news_report = state.get("news_report", "Not available")
         fundamentals_report = state.get("fundamentals_report", "Not available")
-        
+
         # Build context for memory retrieval
         curr_situation = f"{market_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
-        
+
         # Retrieve past memories
         past_memories = ""
         if memory:
             memories = memory.get_memories(curr_situation, n_matches=2)
             for rec in memories:
                 past_memories += rec.get("recommendation", "") + "\n\n"
-        
+
         if not past_memories:
             past_memories = "No relevant historical analysis available."
-        
+
         # Build prompt using PromptManager
         prompt = pm.get_prompt(
             PromptNames.EXPERT_BUFFETT,
@@ -60,10 +60,10 @@ def create_buffett_agent(llm, memory, prompt_manager: Optional[object] = None) -
                 "output_schema": json.dumps(EXPERT_OUTPUT_SCHEMA, indent=2),
             }
         )
-        
+
         # Get LLM response
         response = llm.invoke(prompt)
-        
+
         # Parse response
         try:
             # Try to extract JSON from response
@@ -80,7 +80,7 @@ def create_buffett_agent(llm, memory, prompt_manager: Optional[object] = None) -
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse Buffett response as JSON: %s", e)
             evaluation = _create_fallback_evaluation(response.content)
-        
+
         # Build expert evaluation entry
         expert_evaluation = {
             "expert_id": "buffett",
@@ -88,13 +88,13 @@ def create_buffett_agent(llm, memory, prompt_manager: Optional[object] = None) -
             "evaluation": evaluation,
             "raw_response": response.content,
         }
-        
+
         # Update state with expert evaluation
         existing_evaluations = state.get("expert_evaluations", [])
         existing_evaluations.append(expert_evaluation)
-        
+
         return {"expert_evaluations": existing_evaluations}
-    
+
     return buffett_node
 
 
@@ -108,7 +108,7 @@ def _create_fallback_evaluation(content: str) -> ExpertOutput:
         recommendation = "SELL"
     else:
         recommendation = "HOLD"
-    
+
     return {
         "recommendation": recommendation,
         "confidence": 0.5,

@@ -1,6 +1,7 @@
-import questionary
-from typing import List, Optional, Tuple, Dict
 
+import questionary
+
+from cli.console import console
 from cli.models import AnalystType
 
 ANALYST_ORDER = [
@@ -32,23 +33,25 @@ def get_ticker() -> str:
 
 
 def get_analysis_date() -> str:
-    """Prompt the user to enter a date in YYYY-MM-DD format."""
+    """Prompt the user to enter a date in YYYY-MM-DD format (not in the future)."""
     import re
     from datetime import datetime
 
-    def validate_date(date_str: str) -> bool:
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
-            return False
+    def validate_date(date_str: str) -> str | bool:
+        s = date_str.strip()
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+            return "Please enter a valid date in YYYY-MM-DD format."
         try:
-            datetime.strptime(date_str, "%Y-%m-%d")
+            dt = datetime.strptime(s, "%Y-%m-%d")
+            if dt.date() > datetime.now().date():
+                return "Analysis date cannot be in the future."
             return True
         except ValueError:
-            return False
+            return "Please enter a valid date in YYYY-MM-DD format."
 
     date = questionary.text(
         "Enter the analysis date (YYYY-MM-DD):",
-        validate=lambda x: validate_date(x.strip())
-        or "Please enter a valid date in YYYY-MM-DD format.",
+        validate=validate_date,
         style=questionary.Style(
             [
                 ("text", "fg:green"),
@@ -64,7 +67,7 @@ def get_analysis_date() -> str:
     return date.strip()
 
 
-def select_analysts() -> List[AnalystType]:
+def select_analysts() -> list[AnalystType]:
     """Select analysts using an interactive checkbox."""
     choices = questionary.checkbox(
         "Select Your [Analysts Team]:",
@@ -263,7 +266,7 @@ def select_llm_provider() -> tuple[str, str]:
         ("Openrouter", "https://openrouter.ai/api/v1"),
         ("Ollama", "http://localhost:11434/v1"),
     ]
-    
+
     choice = questionary.select(
         "Select your LLM Provider:",
         choices=[
@@ -279,11 +282,11 @@ def select_llm_provider() -> tuple[str, str]:
             ]
         ),
     ).ask()
-    
+
     if choice is None:
         console.print("\n[red]no OpenAI backend selected. Exiting...[/red]")
         exit(1)
-    
+
     display_name, url = choice
     print(f"You selected: {display_name}\tURL: {url}")
 

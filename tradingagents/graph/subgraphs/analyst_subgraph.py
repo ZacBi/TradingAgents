@@ -8,7 +8,7 @@
 被 Send API 并行调度, 互不干扰.
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph

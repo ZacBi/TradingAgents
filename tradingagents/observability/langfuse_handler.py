@@ -9,14 +9,14 @@ fallback is returned so the rest of the system works unchanged.
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 def create_langfuse_handler(
-    config: Optional[Dict[str, Any]] = None,
-) -> Optional[Any]:
+    config: dict[str, Any] | None = None,
+) -> Any | None:
     """Create a Langfuse callback handler for LangChain.
 
     Configuration is read from ``config`` dict or environment variables:

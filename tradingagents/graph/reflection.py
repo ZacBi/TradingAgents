@@ -1,6 +1,7 @@
 # TradingAgents/graph/reflection.py
 
-from typing import Dict, Any
+from typing import Any
+
 from langchain_openai import ChatOpenAI
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
@@ -14,7 +15,7 @@ class Reflector:
         self.quick_thinking_llm = quick_thinking_llm
         self.pm = get_prompt_manager()
 
-    def _extract_current_situation(self, current_state: Dict[str, Any]) -> str:
+    def _extract_current_situation(self, current_state: dict[str, Any]) -> str:
         """Extract the current market situation from the state."""
         curr_market_report = current_state["market_report"]
         curr_sentiment_report = current_state["sentiment_report"]

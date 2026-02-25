@@ -4,9 +4,9 @@
 纯 Python 实现，无外部数学库依赖。
 """
 
-import math
 import logging
-from typing import Literal
+import math
+
 from typing_extensions import TypedDict
 
 logger = logging.getLogger(__name__)

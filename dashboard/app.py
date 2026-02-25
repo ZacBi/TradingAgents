@@ -1,7 +1,15 @@
 """Streamlit dashboard for TradingAgents: decisions, NAV, and run stats."""
 
 import os
-import streamlit as st
+import sys
+
+try:
+    import streamlit as st
+except ImportError:
+    sys.stderr.write(
+        "Streamlit is required for the dashboard. Install with: uv sync --extra dashboard\n"
+    )
+    sys.exit(1)
 
 st.set_page_config(page_title="TradingAgents Dashboard", layout="wide")
 

@@ -3,7 +3,6 @@
 
 import logging
 import os
-from typing import Optional
 
 from .base import EmbeddingProvider
 
@@ -19,7 +18,7 @@ except ImportError:
 class GoogleEmbeddingProvider(EmbeddingProvider):
     """
     Google embedding provider using Gemini embedding models.
-    
+
     Models:
     - text-embedding-004: Latest, 768 dimensions
     - embedding-001: Legacy
@@ -33,11 +32,11 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
     def __init__(
         self,
         model_name: str = "text-embedding-004",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         """
         Initialize the Google embedding provider.
-        
+
         Args:
             model_name: Name of the Google embedding model
             api_key: Google API key (or uses GOOGLE_API_KEY env var)
@@ -47,16 +46,16 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
                 "google-generativeai package is required. "
                 "Install with: pip install google-generativeai"
             )
-        
+
         self._model_name = model_name
         self._dimension = self.MODEL_DIMENSIONS.get(model_name, 768)
-        
+
         api_key = api_key or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("Google API key is required")
-        
+
         genai.configure(api_key=api_key)
-        
+
         logger.info(
             "Initialized Google embeddings with model=%s, dim=%d",
             model_name, self._dimension
@@ -94,24 +93,24 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
 
 def create_google_embedding_provider(
     config: dict,
-) -> Optional[GoogleEmbeddingProvider]:
+) -> GoogleEmbeddingProvider | None:
     """
     Factory function to create a Google embedding provider.
-    
+
     Args:
         config: Configuration dictionary with optional keys:
             - embedding_model: Model name (default: text-embedding-004)
             - google_api_key: API key
-            
+
     Returns:
         Provider instance or None if not available
     """
     if not GOOGLE_AVAILABLE:
         return None
-    
+
     model_name = config.get("embedding_model", "text-embedding-004")
     api_key = config.get("google_api_key")
-    
+
     try:
         return GoogleEmbeddingProvider(model_name=model_name, api_key=api_key)
     except (ImportError, ValueError) as e:

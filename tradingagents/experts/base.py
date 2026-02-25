@@ -1,8 +1,10 @@
 # TradingAgents/experts/base.py
 """Base types and protocols for the expert framework."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Literal, Any
+from typing import Literal
+
 from typing_extensions import TypedDict
 
 

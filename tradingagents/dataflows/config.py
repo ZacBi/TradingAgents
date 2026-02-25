@@ -1,8 +1,8 @@
+
 import tradingagents.default_config as default_config
-from typing import Dict, Optional
 
 # Use default config but allow it to be overridden
-_config: Optional[Dict] = None
+_config: dict | None = None
 
 
 def initialize_config():
@@ -12,7 +12,7 @@ def initialize_config():
         _config = default_config.DEFAULT_CONFIG.copy()
 
 
-def set_config(config: Dict):
+def set_config(config: dict):
     """Update the configuration with custom values."""
     global _config
     if _config is None:
@@ -20,8 +20,10 @@ def set_config(config: Dict):
     _config.update(config)
 
 
-def get_config() -> Dict:
-    """Get the current configuration."""
+def get_config() -> dict:
+    """Get the current runtime configuration (set by graph/CLI via set_config).
+    For env-based config with masked secrets, use tradingagents.config.get_config().
+    """
     if _config is None:
         initialize_config()
     return _config.copy()

@@ -6,7 +6,8 @@ Supports both InMemoryStore (development) and PostgresStore (production).
 
 import logging
 import uuid
-from typing import Any, Callable, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,8 @@ class FinancialSituationMemory:
     def __init__(
         self,
         name: str,
-        store: Optional[Any] = None,
-        embedder: Optional[Callable[[str], List[float]]] = None,
+        store: Any | None = None,
+        embedder: Callable[[str], list[float]] | None = None,
     ):
         """Initialize the memory system.
 
@@ -46,7 +47,7 @@ class FinancialSituationMemory:
                 name,
             )
 
-    def add_situations(self, situations_and_advice: List[tuple[str, str]]) -> None:
+    def add_situations(self, situations_and_advice: list[tuple[str, str]]) -> None:
         """Add financial situations and their corresponding advice.
 
         Args:
@@ -71,7 +72,7 @@ class FinancialSituationMemory:
             except Exception as e:
                 logger.error("Failed to add memory to '%s': %s", self.name, e)
 
-    def get_memories(self, current_situation: str, n_matches: int = 1) -> List[dict]:
+    def get_memories(self, current_situation: str, n_matches: int = 1) -> list[dict]:
         """Find matching recommendations using semantic similarity.
 
         Args:
@@ -123,7 +124,7 @@ class FinancialSituationMemory:
         )
 
 
-def create_memory_store(config: dict) -> Optional[Any]:
+def create_memory_store(config: dict) -> Any | None:
     """Create a LangGraph Store based on configuration.
 
     Args:
@@ -198,7 +199,7 @@ def create_memory_store(config: dict) -> Optional[Any]:
         return None
 
 
-def create_embedder(config: dict) -> Optional[Callable[[str], List[float]]]:
+def create_embedder(config: dict) -> Callable[[str], list[float]] | None:
     """Create an embedding function based on configuration.
 
     Args:

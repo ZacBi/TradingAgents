@@ -9,7 +9,7 @@ Provides centralized prompt management with Langfuse integration:
 
 Usage:
     from tradingagents.prompts import PromptManager, PromptNames
-    
+
     pm = PromptManager(config)
     prompt = pm.get_prompt(
         PromptNames.EXPERT_BUFFETT,
@@ -17,12 +17,12 @@ Usage:
     )
 """
 
-from .registry import PromptNames, PROMPT_LABELS, ALL_PROMPT_NAMES, TEMPLATE_PATH_MAP
 from .manager import (
     PromptManager,
     get_prompt_manager,
     reset_prompt_manager,
 )
+from .registry import ALL_PROMPT_NAMES, PROMPT_LABELS, TEMPLATE_PATH_MAP, PromptNames
 
 __all__ = [
     # Registry

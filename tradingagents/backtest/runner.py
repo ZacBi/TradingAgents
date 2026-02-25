@@ -3,7 +3,7 @@
 import csv
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import backtrader as bt
 import pandas as pd
@@ -18,7 +18,7 @@ def _load_decisions_from_db(
     ticker: str,
     start_date: str,
     end_date: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Load decisions from SQLite via DatabaseManager."""
     from tradingagents.database import DatabaseManager
 
@@ -26,9 +26,9 @@ def _load_decisions_from_db(
     return db.get_decisions_in_range(ticker, start_date, end_date)
 
 
-def _load_decisions_from_csv(csv_path: str) -> List[Dict[str, Any]]:
+def _load_decisions_from_csv(csv_path: str) -> list[dict[str, Any]]:
     """Load decisions from CSV with columns: ticker, trade_date, final_decision."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     path = Path(csv_path)
     if not path.exists():
         raise FileNotFoundError(f"CSV not found: {csv_path}")
@@ -43,9 +43,9 @@ def _load_decisions_from_csv(csv_path: str) -> List[Dict[str, Any]]:
     return rows
 
 
-def _decisions_to_map(decisions: List[Dict[str, Any]], ticker: Optional[str] = None) -> Dict[str, str]:
+def _decisions_to_map(decisions: list[dict[str, Any]], ticker: str | None = None) -> dict[str, str]:
     """Build date -> BUY|SELL|HOLD map. If ticker is set, filter by ticker."""
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for d in decisions:
         t = (d.get("ticker") or "").strip().upper()
         if ticker and t != ticker.upper():
@@ -85,11 +85,11 @@ def run_backtest(
     ticker: str,
     start_date: str,
     end_date: str,
-    decisions: Optional[Dict[str, str]] = None,
-    decisions_from_db: Optional[str] = None,
-    decisions_from_csv: Optional[str] = None,
+    decisions: dict[str, str] | None = None,
+    decisions_from_db: str | None = None,
+    decisions_from_csv: str | None = None,
     allocation: float = 1.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run backtest and return metrics.
 
     Either pass `decisions` (date -> BUY|SELL|HOLD) directly, or load from DB or CSV.

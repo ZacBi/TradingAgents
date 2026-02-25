@@ -76,6 +76,9 @@ docs/_build/
 .pybuilder/
 target/
 
+# TradingAgents: run output / state logs
+eval_results/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

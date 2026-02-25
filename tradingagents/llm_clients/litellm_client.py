@@ -6,7 +6,7 @@ identifier supported by LiteLLM (e.g. "gemini/gemini-3-flash",
 """
 
 import os
-from typing import Any, Optional
+from typing import Any
 
 from langchain_openai import ChatOpenAI
 
@@ -25,7 +25,7 @@ class LiteLLMClient(BaseLLMClient):
     def __init__(
         self,
         model: str,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
         **kwargs,
     ):
         super().__init__(model, base_url, **kwargs)

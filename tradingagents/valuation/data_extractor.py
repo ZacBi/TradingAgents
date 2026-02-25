@@ -1,9 +1,8 @@
 # tradingagents/valuation/data_extractor.py
 """从 fundamentals_report 或 yfinance 提取结构化财务指标。"""
 
-import re
 import logging
-from typing import Optional
+import re
 
 from .models import FinancialMetrics
 
@@ -84,7 +83,6 @@ def extract_financial_metrics(
     has_price = metrics.get("current_price") is not None
     has_fcf = metrics.get("free_cashflow") is not None
     has_eps = metrics.get("trailing_eps") is not None
-    has_bvps = metrics.get("book_value") is not None
 
     # 若关键字段缺失，尝试 yfinance 补充
     if not (has_price and (has_fcf or has_eps)):

@@ -8,10 +8,10 @@ import json
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 from .models import (
     AgentDecision,
@@ -82,7 +82,7 @@ class DatabaseManager:
     # agent_decisions
     # ------------------------------------------------------------------
 
-    def save_decision(self, decision: Dict[str, Any]) -> int:
+    def save_decision(self, decision: dict[str, Any]) -> int:
         """Insert a new agent decision and return its id.
 
         Expected keys: ticker, trade_date, final_decision, and optionally
@@ -112,41 +112,43 @@ class DatabaseManager:
             return obj.id
 
     def get_decisions(
-        self, ticker: Optional[str] = None, limit: int = 50
-    ) -> List[dict]:
+        self, ticker: str | None = None, limit: int = 50
+    ) -> list[dict]:
         """Retrieve recent decisions, optionally filtered by ticker."""
         with self.session_scope() as session:
-            query = session.query(AgentDecision)
+            stmt = select(AgentDecision)
             if ticker:
-                query = query.filter(AgentDecision.ticker == ticker)
-            query = query.order_by(AgentDecision.created_at.desc()).limit(limit)
-            return [self._model_to_dict(row) for row in query.all()]
+                stmt = stmt.where(AgentDecision.ticker == ticker)
+            stmt = stmt.order_by(AgentDecision.created_at.desc()).limit(limit)
+            rows = session.scalars(stmt).all()
+            return [self._model_to_dict(row) for row in rows]
 
     def get_decisions_in_range(
         self,
         ticker: str,
         start_date: str,
         end_date: str,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Retrieve decisions for a ticker within a date range (inclusive).
 
         start_date and end_date should be YYYY-MM-DD. Used for backtesting.
         """
         with self.session_scope() as session:
-            query = (
-                session.query(AgentDecision)
-                .filter(AgentDecision.ticker == ticker)
-                .filter(AgentDecision.trade_date >= start_date)
-                .filter(AgentDecision.trade_date <= end_date)
+            stmt = (
+                select(AgentDecision)
+                .where(AgentDecision.ticker == ticker)
+                .where(AgentDecision.trade_date >= start_date)
+                .where(AgentDecision.trade_date <= end_date)
                 .order_by(AgentDecision.trade_date.asc())
             )
-            return [self._model_to_dict(row) for row in query.all()]
+            rows = session.scalars(stmt).all()
+            return [self._model_to_dict(row) for row in rows]
 
     # ------------------------------------------------------------------
     # trades
     # ------------------------------------------------------------------
 
-    def record_trade(self, trade: Dict[str, Any]) -> int:
+    def record_trade(self, trade: dict[str, Any]) -> int:
         """Insert a trade record and return its id."""
         with self.session_scope() as session:
             obj = Trade(
@@ -166,11 +168,13 @@ class DatabaseManager:
     # positions
     # ------------------------------------------------------------------
 
-    def upsert_position(self, position: Dict[str, Any]) -> None:
+    def upsert_position(self, position: dict[str, Any]) -> None:
         """Insert or update a position."""
         with self.session_scope() as session:
             ticker = position["ticker"]
-            existing = session.query(Position).filter(Position.ticker == ticker).first()
+            existing = session.scalars(
+                select(Position).where(Position.ticker == ticker)
+            ).first()
 
             if existing:
                 existing.quantity = position.get("quantity", 0)
@@ -187,23 +191,24 @@ class DatabaseManager:
                 )
                 session.add(obj)
 
-    def get_positions(self) -> List[dict]:
+    def get_positions(self) -> list[dict]:
         """Get all open positions."""
         with self.session_scope() as session:
-            positions = (
-                session.query(Position).filter(Position.quantity != 0).all()
-            )
+            stmt = select(Position).where(Position.quantity != 0)
+            positions = session.scalars(stmt).all()
             return [self._model_to_dict(p) for p in positions]
 
     # ------------------------------------------------------------------
     # daily_nav
     # ------------------------------------------------------------------
 
-    def record_nav(self, nav: Dict[str, Any]) -> None:
+    def record_nav(self, nav: dict[str, Any]) -> None:
         """Insert or replace daily NAV snapshot."""
         with self.session_scope() as session:
             date = nav["date"]
-            existing = session.query(DailyNav).filter(DailyNav.date == date).first()
+            existing = session.scalars(
+                select(DailyNav).where(DailyNav.date == date)
+            ).first()
 
             if existing:
                 existing.total_value = nav["total_value"]
@@ -222,22 +227,18 @@ class DatabaseManager:
                 )
                 session.add(obj)
 
-    def get_daily_nav(self, limit: int = 365) -> List[dict]:
+    def get_daily_nav(self, limit: int = 365) -> list[dict]:
         """Retrieve daily NAV records, most recent first, for dashboard/charts."""
         with self.session_scope() as session:
-            rows = (
-                session.query(DailyNav)
-                .order_by(DailyNav.date.desc())
-                .limit(limit)
-                .all()
-            )
+            stmt = select(DailyNav).order_by(DailyNav.date.desc()).limit(limit)
+            rows = session.scalars(stmt).all()
             return [self._model_to_dict(r) for r in reversed(rows)]
 
     # ------------------------------------------------------------------
     # Raw data archive helpers
     # ------------------------------------------------------------------
 
-    def save_raw_market_data(self, data: Dict[str, Any]) -> int:
+    def save_raw_market_data(self, data: dict[str, Any]) -> int:
         """Archive raw market data and return its id."""
         with self.session_scope() as session:
             obj = RawMarketData(
@@ -251,7 +252,7 @@ class DatabaseManager:
             session.flush()
             return obj.id
 
-    def save_raw_news(self, data: Dict[str, Any]) -> int:
+    def save_raw_news(self, data: dict[str, Any]) -> int:
         """Archive raw news data and return its id."""
         with self.session_scope() as session:
             obj = RawNews(
@@ -266,7 +267,7 @@ class DatabaseManager:
             session.flush()
             return obj.id
 
-    def save_raw_fundamentals(self, data: Dict[str, Any]) -> int:
+    def save_raw_fundamentals(self, data: dict[str, Any]) -> int:
         """Archive raw fundamentals data and return its id."""
         with self.session_scope() as session:
             obj = RawFundamentals(
@@ -296,14 +297,13 @@ class DatabaseManager:
             )
             session.add(obj)
 
-    def get_decision_data(self, decision_id: int) -> List[dict]:
+    def get_decision_data(self, decision_id: int) -> list[dict]:
         """Retrieve all raw data references for a given decision."""
         with self.session_scope() as session:
-            links = (
-                session.query(DecisionDataLink)
-                .filter(DecisionDataLink.decision_id == decision_id)
-                .all()
+            stmt = select(DecisionDataLink).where(
+                DecisionDataLink.decision_id == decision_id
             )
+            links = session.scalars(stmt).all()
             return [self._model_to_dict(link) for link in links]
 
     # ------------------------------------------------------------------

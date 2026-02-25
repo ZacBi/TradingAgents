@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Column,
     DateTime,
     Float,
     ForeignKey,
@@ -59,7 +58,7 @@ class Trade(Base):
     price: Mapped[float] = mapped_column(Float, nullable=False)
     commission: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0)
-    decision_id: Mapped[Optional[int]] = mapped_column(
+    decision_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("agent_decisions.id"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -99,17 +98,17 @@ class AgentDecision(Base):
     ticker: Mapped[str] = mapped_column(String, nullable=False)
     trade_date: Mapped[str] = mapped_column(String, nullable=False)
     final_decision: Mapped[str] = mapped_column(String, nullable=False)  # BUY/SELL/HOLD
-    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    langfuse_trace_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    langfuse_trace_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    market_report: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sentiment_report: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    news_report: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    fundamentals_report: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    valuation_result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    debate_history: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    expert_opinions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    risk_assessment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    langfuse_trace_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    langfuse_trace_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    market_report: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sentiment_report: Mapped[str | None] = mapped_column(Text, nullable=True)
+    news_report: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fundamentals_report: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valuation_result: Mapped[str | None] = mapped_column(Text, nullable=True)
+    debate_history: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expert_opinions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    risk_assessment: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now()
     )
@@ -159,8 +158,8 @@ class RawMarketData(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String, nullable=False)
     trade_date: Mapped[str] = mapped_column(String, nullable=False)
-    price_data_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    indicators_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    price_data_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    indicators_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String, nullable=False, default="yfinance")
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now()
@@ -175,12 +174,12 @@ class RawNews(Base):
     __tablename__ = "raw_news"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ticker: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    ticker: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     source: Mapped[str] = mapped_column(String, nullable=False)
-    title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    published_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    published_at: Mapped[str | None] = mapped_column(String, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now()
     )
@@ -194,10 +193,10 @@ class RawSocialSentiment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String, nullable=False)
     platform: Mapped[str] = mapped_column(String, nullable=False)
-    raw_posts_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sentiment_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    raw_posts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     post_count: Mapped[int] = mapped_column(Integer, default=0)
-    target_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    target_date: Mapped[str | None] = mapped_column(String, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now()
     )
@@ -213,9 +212,9 @@ class RawFundamentals(Base):
     data_type: Mapped[str] = mapped_column(
         String, nullable=False
     )  # balance_sheet / cashflow / income_statement / info
-    data_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String, nullable=False, default="yfinance")
-    report_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    report_date: Mapped[str | None] = mapped_column(String, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now()
     )
@@ -230,14 +229,14 @@ class RawDeepResearch(Base):
     ticker: Mapped[str] = mapped_column(String, nullable=False)
     provider: Mapped[str] = mapped_column(String, nullable=False)
     model: Mapped[str] = mapped_column(String, nullable=False)
-    query: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    report_markdown: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sources_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    trigger_reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    query: Mapped[str | None] = mapped_column(Text, nullable=True)
+    report_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sources_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trigger_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     cost: Mapped[float] = mapped_column(Float, default=0)
-    started_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    completed_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    started_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    completed_at: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class RawMacroData(Base):
@@ -247,7 +246,7 @@ class RawMacroData(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     indicator: Mapped[str] = mapped_column(String, nullable=False)
-    value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
     observation_date: Mapped[str] = mapped_column(String, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False, default="fred")
     fetched_at: Mapped[datetime] = mapped_column(

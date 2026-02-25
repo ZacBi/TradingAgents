@@ -3,7 +3,6 @@
 
 import logging
 import os
-from typing import Optional
 from dataclasses import dataclass
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
@@ -32,18 +31,18 @@ class DeepResearchResult:
 class GeminiDeepResearchProvider:
     """
     Gemini Deep Research provider using Google's generative AI.
-    
+
     Uses Gemini models with grounding enabled for web search.
     """
 
     def __init__(
         self,
         model_name: str = "gemini-2.0-flash",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         """
         Initialize the Gemini Deep Research provider.
-        
+
         Args:
             model_name: Gemini model to use
             api_key: Google API key (or uses GOOGLE_API_KEY env var)
@@ -53,15 +52,15 @@ class GeminiDeepResearchProvider:
                 "google-generativeai is required. "
                 "Install with: pip install google-generativeai"
             )
-        
+
         self._model_name = model_name
-        
+
         api_key = api_key or os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("Google API key is required for Gemini Deep Research")
-        
+
         genai.configure(api_key=api_key)
-        
+
         # Configure the model with Google Search grounding
         self._model = genai.GenerativeModel(
             model_name=model_name,
@@ -69,33 +68,33 @@ class GeminiDeepResearchProvider:
             tools="google_search_retrieval",
         )
         self.pm = get_prompt_manager()
-        
+
         logger.info("Initialized Gemini Deep Research with model=%s", model_name)
 
     def research(
         self,
         query: str,
-        ticker: Optional[str] = None,
-        context: Optional[str] = None,
+        ticker: str | None = None,
+        context: str | None = None,
     ) -> DeepResearchResult:
         """
         Perform deep research on a query.
-        
+
         Args:
             query: Research query
             ticker: Optional stock ticker for context
             context: Optional additional context
-            
+
         Returns:
             DeepResearchResult with report and sources
         """
         # Build the research prompt
         full_query = self._build_research_prompt(query, ticker, context)
-        
+
         try:
             # Generate with grounding
             response = self._model.generate_content(full_query)
-            
+
             # Extract sources from grounding metadata if available
             sources = []
             if hasattr(response, 'candidates') and response.candidates:
@@ -104,12 +103,12 @@ class GeminiDeepResearchProvider:
                     grounding = candidate.grounding_metadata
                     if hasattr(grounding, 'web_search_queries'):
                         sources = list(grounding.web_search_queries)
-            
+
             # Get token count
             tokens_used = 0
             if hasattr(response, 'usage_metadata'):
                 tokens_used = getattr(response.usage_metadata, 'total_token_count', 0)
-            
+
             return DeepResearchResult(
                 report=response.text,
                 sources=sources,
@@ -118,7 +117,7 @@ class GeminiDeepResearchProvider:
                 model=self._model_name,
                 tokens_used=tokens_used,
             )
-            
+
         except Exception as e:
             logger.error("Gemini Deep Research failed: %s", e)
             return DeepResearchResult(
@@ -132,8 +131,8 @@ class GeminiDeepResearchProvider:
     def _build_research_prompt(
         self,
         query: str,
-        ticker: Optional[str],
-        context: Optional[str],
+        ticker: str | None,
+        context: str | None,
     ) -> str:
         """Build a comprehensive research prompt."""
         ticker_section = f"\n\n## Stock of Interest: {ticker}" if ticker else ""
@@ -146,24 +145,24 @@ class GeminiDeepResearchProvider:
         })
 
 
-def create_gemini_provider(config: dict) -> Optional[GeminiDeepResearchProvider]:
+def create_gemini_provider(config: dict) -> GeminiDeepResearchProvider | None:
     """
     Factory function to create a Gemini Deep Research provider.
-    
+
     Args:
         config: Configuration with optional keys:
             - deep_research_model: Model name
             - google_api_key: API key
-            
+
     Returns:
         Provider instance or None if not available
     """
     if not GEMINI_AVAILABLE:
         return None
-    
+
     model = config.get("deep_research_model", "gemini-2.0-flash")
     api_key = config.get("google_api_key")
-    
+
     try:
         return GeminiDeepResearchProvider(model_name=model, api_key=api_key)
     except (ImportError, ValueError) as e:

@@ -5,7 +5,7 @@ Replaces stockstats with pandas-ta for explicit, performant indicator calculatio
 
 import logging
 import os
-from typing import Annotated, Optional
+from typing import Annotated
 
 import pandas as pd
 import pandas_ta as ta
@@ -40,6 +40,44 @@ INDICATOR_MAPPING = {
 }
 
 
+def _get_ohlcv(df: pd.DataFrame) -> tuple:
+    """Return (close, high, low, volume) with normalized column names."""
+    close = df["Close"] if "Close" in df.columns else df["close"]
+    high = df["High"] if "High" in df.columns else df.get("high")
+    low = df["Low"] if "Low" in df.columns else df.get("low")
+    volume = df["Volume"] if "Volume" in df.columns else df.get("volume")
+    return close, high, low, volume
+
+
+def _calc_macd_or_bbands(ta_func, close: pd.Series, indicator: str, func_name: str, kwargs: dict, null_series: pd.Series):
+    """Compute MACD or BBANDS and return the requested column."""
+    df_out = ta_func(close, **kwargs)
+    if df_out is None:
+        return null_series
+    if func_name == "macd":
+        col = {"macd": 0, "macds": 2, "macdh": 1}.get(indicator, 0)
+    else:
+        col = {"boll": 1, "boll_ub": 2, "boll_lb": 0}.get(indicator, 1)
+    return df_out.iloc[:, col]
+
+
+def _calc_hlv_indicator(
+    ta_func, func_name: str, close, high, low, volume, kwargs: dict
+) -> pd.Series:
+    """Compute ATR, VWMA, or MFI with column checks."""
+    if func_name == "atr":
+        if high is None or low is None:
+            raise ValueError("ATR requires High, Low, Close columns")
+        return ta_func(high, low, close, **kwargs)
+    if func_name == "vwma":
+        if volume is None:
+            raise ValueError("VWMA requires Volume column")
+        return ta_func(close, volume, **kwargs)
+    if high is None or low is None or volume is None:
+        raise ValueError("MFI requires High, Low, Close, Volume columns")
+    return ta_func(high, low, close, volume, **kwargs)
+
+
 def calculate_indicator(df: pd.DataFrame, indicator: str) -> pd.Series:
     """Calculate a single indicator using pandas-ta.
 
@@ -55,70 +93,21 @@ def calculate_indicator(df: pd.DataFrame, indicator: str) -> pd.Series:
             f"Indicator '{indicator}' not supported. "
             f"Available: {list(INDICATOR_MAPPING.keys())}"
         )
-
     func_name, kwargs = INDICATOR_MAPPING[indicator]
-
-    # Get the pandas-ta function
     ta_func = getattr(ta, func_name, None)
     if ta_func is None:
         raise ValueError(f"pandas-ta function '{func_name}' not found")
 
-    # Prepare input columns (normalize column names)
-    close = df["Close"] if "Close" in df.columns else df["close"]
-    high = df["High"] if "High" in df.columns else df.get("high")
-    low = df["Low"] if "Low" in df.columns else df.get("low")
-    volume = df["Volume"] if "Volume" in df.columns else df.get("volume")
+    close, high, low, volume = _get_ohlcv(df)
+    null_series = pd.Series([None] * len(df), index=df.index)
 
-    # Calculate based on function type
-    if func_name == "sma":
-        result = ta_func(close, **kwargs)
-    elif func_name == "ema":
-        result = ta_func(close, **kwargs)
-    elif func_name == "rsi":
-        result = ta_func(close, **kwargs)
-    elif func_name == "macd":
-        macd_df = ta_func(close, **kwargs)
-        if macd_df is None:
-            return pd.Series([None] * len(df), index=df.index)
-        # Map to specific MACD column
-        if indicator == "macd":
-            result = macd_df.iloc[:, 0]  # MACD line
-        elif indicator == "macds":
-            result = macd_df.iloc[:, 2]  # Signal line
-        elif indicator == "macdh":
-            result = macd_df.iloc[:, 1]  # Histogram
-        else:
-            result = macd_df.iloc[:, 0]
-    elif func_name == "bbands":
-        bb_df = ta_func(close, **kwargs)
-        if bb_df is None:
-            return pd.Series([None] * len(df), index=df.index)
-        # Map to specific Bollinger Band column
-        if indicator == "boll":
-            result = bb_df.iloc[:, 1]  # Middle band
-        elif indicator == "boll_ub":
-            result = bb_df.iloc[:, 2]  # Upper band
-        elif indicator == "boll_lb":
-            result = bb_df.iloc[:, 0]  # Lower band
-        else:
-            result = bb_df.iloc[:, 1]
-    elif func_name == "atr":
-        if high is None or low is None:
-            raise ValueError("ATR requires High, Low, Close columns")
-        result = ta_func(high, low, close, **kwargs)
-    elif func_name == "vwma":
-        if volume is None:
-            raise ValueError("VWMA requires Volume column")
-        result = ta_func(close, volume, **kwargs)
-    elif func_name == "mfi":
-        if high is None or low is None or volume is None:
-            raise ValueError("MFI requires High, Low, Close, Volume columns")
-        result = ta_func(high, low, close, volume, **kwargs)
-    else:
-        # Generic fallback
-        result = ta_func(close, **kwargs)
-
-    return result
+    if func_name in ("sma", "ema", "rsi"):
+        return ta_func(close, **kwargs)
+    if func_name in ("macd", "bbands"):
+        return _calc_macd_or_bbands(ta_func, close, indicator, func_name, kwargs, null_series)
+    if func_name in ("atr", "vwma", "mfi"):
+        return _calc_hlv_indicator(ta_func, func_name, close, high, low, volume, kwargs)
+    return ta_func(close, **kwargs)
 
 
 def calculate_all_indicators(df: pd.DataFrame) -> pd.DataFrame:

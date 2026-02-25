@@ -1,57 +1,48 @@
 # TradingAgents/graph/trading_graph.py
 
-import os
-import logging
-from pathlib import Path
 import json
-from datetime import date
-from typing import Dict, Any, Tuple, List, Optional
+import logging
+import os
+from pathlib import Path
+from typing import Any
 
 from langgraph.prebuilt import ToolNode
 
-from tradingagents.llm_clients import create_llm_client
-
-from tradingagents.agents import *
-from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.agents.utils.memory import (
-    FinancialSituationMemory,
-    create_memory_store,
-    create_embedder,
-)
-from tradingagents.agents.utils.agent_states import (
-    AgentState,
-    InvestDebateState,
-    RiskDebateState,
-)
-from tradingagents.dataflows.config import set_config
-
 # Import the new abstract tool methods from agent_utils
 from tradingagents.agents.utils.agent_utils import (
-    get_stock_data,
-    get_indicators,
-    get_fundamentals,
     get_balance_sheet,
     get_cashflow,
-    get_income_statement,
-    get_news,
-    get_insider_transactions,
-    get_global_news,
-    get_earnings_dates,
-    get_valuation_metrics,
-    get_institutional_holders,
     get_cpi_data,
+    get_earnings_dates,
+    get_fundamentals,
     get_gdp_data,
+    get_global_news,
+    get_income_statement,
+    get_indicators,
+    get_insider_transactions,
+    get_institutional_holders,
     get_interest_rate_data,
-    get_unemployment_data,
-    get_m2_data,
-    get_realtime_quote,
     get_kline_data,
+    get_m2_data,
+    get_news,
+    get_realtime_quote,
+    get_stock_data,
+    get_unemployment_data,
+    get_valuation_metrics,
 )
+from tradingagents.agents.utils.memory import (
+    FinancialSituationMemory,
+    create_embedder,
+    create_memory_store,
+)
+from tradingagents.dataflows.config import set_config
+from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.llm_clients import create_llm_client
 
 from .conditional_logic import ConditionalLogic
-from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
+from .setup import GraphSetup
 from .signal_processing import SignalProcessor
 
 logger = logging.getLogger(__name__)
@@ -62,10 +53,10 @@ class TradingAgentsGraph:
 
     def __init__(
         self,
-        selected_analysts=["market", "social", "news", "fundamentals"],
+        selected_analysts=None,
         debug=False,
-        config: Dict[str, Any] = None,
-        callbacks: Optional[List] = None,
+        config: dict[str, Any] = None,
+        callbacks: list | None = None,
     ):
         """Initialize the trading agents graph and components.
 
@@ -75,6 +66,8 @@ class TradingAgentsGraph:
             config: Configuration dictionary. If None, uses default config
             callbacks: Optional list of callback handlers (e.g., for tracking LLM/tool stats)
         """
+        if selected_analysts is None:
+            selected_analysts = ["market", "social", "news", "fundamentals"]
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
         self.callbacks = callbacks or []
@@ -132,7 +125,7 @@ class TradingAgentsGraph:
             )
             self.deep_thinking_llm = deep_client.get_llm()
             self.quick_thinking_llm = quick_client.get_llm()
-        
+
         # --- Phase 5: Initialize LangGraph Store for memory ---
         self.store = None
         self.embedder = None
@@ -316,7 +309,7 @@ class TradingAgentsGraph:
     # Existing methods (unchanged logic)
     # ------------------------------------------------------------------
 
-    def _get_provider_kwargs(self) -> Dict[str, Any]:
+    def _get_provider_kwargs(self) -> dict[str, Any]:
         """Get provider-specific kwargs for LLM client creation."""
         kwargs = {}
         provider = self.config.get("llm_provider", "").lower()
@@ -333,7 +326,7 @@ class TradingAgentsGraph:
 
         return kwargs
 
-    def _create_tool_nodes(self) -> Dict[str, ToolNode]:
+    def _create_tool_nodes(self) -> dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
         return {
             "market": ToolNode(
@@ -384,8 +377,19 @@ class TradingAgentsGraph:
 
     def propagate(self, company_name, trade_date):
         """Run the trading agents graph for a company on a specific date."""
+        from tradingagents.utils.validation import validate_ticker, validate_trade_date
+
+        validate_ticker(company_name)
+        validate_trade_date(trade_date)
 
         self.ticker = company_name
+
+        # Lineage: collect data_ids during this run for decision_data_links
+        from tradingagents.graph.lineage import get_data_ids, set_lineage_collector
+        set_lineage_collector([])
+        if self.config.get("database_enabled") and self.db:
+            from tradingagents.dataflows.config import set_config
+            set_config({**self.config, "db": self.db})
 
         # Initialize state
         init_agent_state = self.propagator.create_initial_state(
@@ -423,13 +427,27 @@ class TradingAgentsGraph:
         signal = self.process_signal(final_state["final_trade_decision"])
 
         # --- Phase 1: Persist decision to database ---
+        data_ids = get_data_ids()
         if self.db:
-            self._persist_decision(final_state, signal)
+            self._persist_decision(final_state, signal, data_ids=data_ids)
 
         # Return decision and processed signal
         return final_state, signal
 
-    def _persist_decision(self, final_state: dict, signal: str):
+    def persist_decision(self, final_state: dict, signal: str) -> None:
+        """Persist a decision to the database (if database_enabled).
+        Call this from CLI or other entry points that run the graph without propagate().
+        """
+        if self.db:
+            from tradingagents.graph.lineage import get_data_ids
+            self._persist_decision(final_state, signal, data_ids=get_data_ids())
+
+    def _persist_decision(
+        self,
+        final_state: dict,
+        signal: str,
+        data_ids: list[tuple] | None = None,
+    ):
         """Save the decision and related data to the database."""
         try:
             # Extract Langfuse trace_id if available
@@ -456,6 +474,12 @@ class TradingAgentsGraph:
                 "debate_history": final_state.get("investment_debate_state", {}).get("history", ""),
                 "risk_assessment": final_state.get("risk_debate_state", {}).get("history", ""),
             })
+            # Link raw data used in this run to the decision
+            for data_type, raw_id in (data_ids or []):
+                try:
+                    self.db.link_data_to_decision(decision_id, data_type, raw_id)
+                except Exception as link_exc:
+                    logger.warning("Failed to link data to decision: %s", link_exc)
             logger.info("Decision persisted: id=%d signal=%s trace_id=%s", decision_id, signal, trace_id)
         except Exception as exc:
             logger.warning("Failed to persist decision: %s", exc)
@@ -494,11 +518,12 @@ class TradingAgentsGraph:
         }
 
         # Save to file
-        directory = Path(f"eval_results/{self.ticker}/TradingAgentsStrategy_logs/")
+        log_dir = self.config.get("eval_log_dir", "eval_results")
+        directory = Path(log_dir) / self.ticker / "TradingAgentsStrategy_logs"
         directory.mkdir(parents=True, exist_ok=True)
 
         with open(
-            f"eval_results/{self.ticker}/TradingAgentsStrategy_logs/full_states_log_{trade_date}.json",
+            directory / f"full_states_log_{trade_date}.json",
             "w",
         ) as f:
             json.dump(self.log_states_dict, f, indent=4)

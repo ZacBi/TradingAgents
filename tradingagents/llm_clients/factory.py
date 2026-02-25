@@ -1,16 +1,15 @@
-from typing import Optional
 
-from .base_client import BaseLLMClient
-from .openai_client import OpenAIClient
 from .anthropic_client import AnthropicClient
+from .base_client import BaseLLMClient
 from .google_client import GoogleClient
 from .litellm_client import LiteLLMClient
+from .openai_client import OpenAIClient
 
 
 def create_llm_client(
     provider: str,
     model: str,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
     **kwargs,
 ) -> BaseLLMClient:
     """Create an LLM client for the specified provider.

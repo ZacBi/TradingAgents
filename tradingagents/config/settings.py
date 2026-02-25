@@ -5,22 +5,27 @@ Replaces dict-based DEFAULT_CONFIG with structured Pydantic models.
 
 Usage:
     from tradingagents.config.settings import get_settings
-    
+
     settings = get_settings()
     print(settings.llm_provider)
     print(settings.database.path)
-    
+
     # For backward compatibility with dict access:
     config_dict = settings.to_dict()
 """
 
-import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Keys masked in to_dict(safe=True) to avoid leaking into logs/APIs
+_SECRET_CONFIG_KEYS = frozenset({
+    "fred_api_key", "longport_app_key", "longport_app_secret",
+    "longport_access_token", "langfuse_secret_key", "langfuse_public_key",
+})
 
 
 class LLMSettings(BaseSettings):
@@ -35,10 +40,10 @@ class LLMSettings(BaseSettings):
     deep_think_llm: str = "gpt-5.2"
     quick_think_llm: str = "gpt-5-mini"
     backend_url: str = "https://api.openai.com/v1"
-    
+
     # Provider-specific thinking configuration
-    google_thinking_level: Optional[str] = None
-    openai_reasoning_effort: Optional[str] = None
+    google_thinking_level: str | None = None
+    openai_reasoning_effort: str | None = None
 
 
 class DataVendorSettings(BaseSettings):
@@ -68,7 +73,7 @@ class DatabaseSettings(BaseSettings):
 
     enabled: bool = True
     path: str = "tradingagents.db"
-    url: Optional[str] = Field(
+    url: str | None = Field(
         default=None,
         description="Full database URL. If set, overrides path for SQLite.",
     )
@@ -92,7 +97,7 @@ class CheckpointSettings(BaseSettings):
     enabled: bool = True
     storage: Literal["memory", "sqlite", "postgres"] = "memory"
     sqlite_path: str = "checkpoints.db"
-    postgres_url: Optional[str] = Field(
+    postgres_url: str | None = Field(
         default=None,
         validation_alias="TRADINGAGENTS_POSTGRES_URL",
     )
@@ -108,11 +113,11 @@ class StoreSettings(BaseSettings):
 
     enabled: bool = True
     backend: Literal["memory", "postgres"] = "memory"
-    postgres_url: Optional[str] = Field(
+    postgres_url: str | None = Field(
         default=None,
         validation_alias="TRADINGAGENTS_POSTGRES_URL",
     )
-    
+
     # Embedding configuration for semantic search
     embedding_provider: Literal["openai", "sentence_transformers"] = "openai"
     embedding_model: str = "text-embedding-3-small"
@@ -128,8 +133,8 @@ class LangfuseSettings(BaseSettings):
     )
 
     enabled: bool = Field(default=False, validation_alias="TRADINGAGENTS_LANGFUSE_ENABLED")
-    public_key: Optional[str] = Field(default=None, validation_alias="LANGFUSE_PUBLIC_KEY")
-    secret_key: Optional[str] = Field(default=None, validation_alias="LANGFUSE_SECRET_KEY")
+    public_key: str | None = Field(default=None, validation_alias="LANGFUSE_PUBLIC_KEY")
+    secret_key: str | None = Field(default=None, validation_alias="LANGFUSE_SECRET_KEY")
     host: str = "http://localhost:3000"
 
 
@@ -144,7 +149,7 @@ class DebateSettings(BaseSettings):
     max_rounds: int = 1
     max_risk_discuss_rounds: int = 1
     max_recur_limit: int = 100
-    
+
     # Dynamic convergence detection
     convergence_enabled: bool = True
     semantic_threshold: float = 0.85
@@ -162,7 +167,7 @@ class ExpertsSettings(BaseSettings):
     enabled: bool = True
     max_experts: int = 3
     selection_mode: Literal["auto", "manual", "random"] = "auto"
-    selected_experts: Optional[list[str]] = None
+    selected_experts: list[str] | None = None
 
 
 class DeepResearchSettings(BaseSettings):
@@ -220,7 +225,7 @@ class PromptSettings(BaseSettings):
     management_enabled: bool = True
     cache_ttl: int = 300
     fallback_enabled: bool = True
-    version: Optional[str] = None
+    version: str | None = None
 
 
 class APIKeySettings(BaseSettings):
@@ -230,20 +235,20 @@ class APIKeySettings(BaseSettings):
         extra="ignore",
     )
 
-    fred_api_key: Optional[str] = Field(default=None, validation_alias="FRED_API_KEY")
-    longport_app_key: Optional[str] = Field(default=None, validation_alias="LONGPORT_APP_KEY")
-    longport_app_secret: Optional[str] = Field(default=None, validation_alias="LONGPORT_APP_SECRET")
-    longport_access_token: Optional[str] = Field(default=None, validation_alias="LONGPORT_ACCESS_TOKEN")
+    fred_api_key: str | None = Field(default=None, validation_alias="FRED_API_KEY")
+    longport_app_key: str | None = Field(default=None, validation_alias="LONGPORT_APP_KEY")
+    longport_app_secret: str | None = Field(default=None, validation_alias="LONGPORT_APP_SECRET")
+    longport_access_token: str | None = Field(default=None, validation_alias="LONGPORT_ACCESS_TOKEN")
 
 
 class Settings(BaseSettings):
     """Root settings class aggregating all configuration sections.
-    
+
     Environment variables are loaded automatically with the following prefixes:
     - TRADINGAGENTS_* for general settings
     - LANGFUSE_* for observability
     - FRED_API_KEY, LONGPORT_* for API keys
-    
+
     Example .env file:
         TRADINGAGENTS_LLM_PROVIDER=openai
         TRADINGAGENTS_DB_PATH=my_database.db
@@ -267,7 +272,7 @@ class Settings(BaseSettings):
         default=Path("./results"),
         validation_alias="TRADINGAGENTS_RESULTS_DIR",
     )
-    data_cache_dir: Optional[Path] = None
+    data_cache_dir: Path | None = None
 
     # Nested configuration sections
     llm: LLMSettings = Field(default_factory=LLMSettings)
@@ -286,11 +291,11 @@ class Settings(BaseSettings):
 
     # Model routing
     model_routing_enabled: bool = False
-    model_routing_config: Optional[str] = None
-    model_routing_profile: Optional[str] = None
+    model_routing_config: str | None = None
+    model_routing_profile: str | None = None
 
     # Unified PostgreSQL URL (shared across Store, Checkpoint, Database)
-    postgres_url: Optional[str] = Field(
+    postgres_url: str | None = Field(
         default=None,
         validation_alias="TRADINGAGENTS_POSTGRES_URL",
     )
@@ -317,12 +322,13 @@ class Settings(BaseSettings):
                 self.database.url = self.postgres_url
         return self
 
-    def to_dict(self) -> dict:
+    def to_dict(self, safe: bool = True) -> dict:
         """Convert to flat dictionary for backward compatibility.
-        
+
         Returns a dict matching the original DEFAULT_CONFIG structure.
+        When safe=True (default), secret-like keys are masked to avoid leaking into logs/APIs.
         """
-        return {
+        raw = {
             "project_dir": str(self.project_dir),
             "results_dir": str(self.results_dir),
             "data_cache_dir": str(self.data_cache_dir),
@@ -415,12 +421,17 @@ class Settings(BaseSettings):
             # Unified postgres
             "postgres_url": self.postgres_url,
         }
+        if safe:
+            for k in _SECRET_CONFIG_KEYS:
+                if k in raw and raw[k] is not None and raw[k] != "":
+                    raw[k] = "***"
+        return raw
 
 
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance.
-    
+
     Uses LRU cache for singleton pattern. Call get_settings.cache_clear()
     to reload settings from environment.
     """
@@ -428,8 +439,7 @@ def get_settings() -> Settings:
 
 
 def get_config() -> dict:
-    """Backward-compatible function returning dict config.
-    
-    Equivalent to importing DEFAULT_CONFIG from default_config.py.
+    """Return env-based config as dict (sanitized: secrets masked).
+    Use dataflows.config.get_config() for runtime graph config.
     """
-    return get_settings().to_dict()
+    return get_settings().to_dict(safe=True)

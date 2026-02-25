@@ -1,7 +1,6 @@
 # TradingAgents/experts/registry.py
 """Expert registry for managing and discovering investment experts."""
 
-from typing import Optional
 import logging
 
 from .base import ExpertProfile
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 class ExpertRegistry:
     """
     Global registry for investment expert agents.
-    
+
     Provides registration, discovery, and filtering of experts.
     Experts register themselves at module import time.
     """
@@ -23,10 +22,10 @@ class ExpertRegistry:
     def register(cls, profile: ExpertProfile) -> None:
         """
         Register an expert to the global registry.
-        
+
         Args:
             profile: The expert profile to register
-            
+
         Raises:
             ValueError: If an expert with the same ID already exists
         """
@@ -41,10 +40,10 @@ class ExpertRegistry:
     def unregister(cls, expert_id: str) -> bool:
         """
         Remove an expert from the registry.
-        
+
         Args:
             expert_id: The ID of the expert to remove
-            
+
         Returns:
             True if expert was removed, False if not found
         """
@@ -54,13 +53,13 @@ class ExpertRegistry:
         return False
 
     @classmethod
-    def get(cls, expert_id: str) -> Optional[ExpertProfile]:
+    def get(cls, expert_id: str) -> ExpertProfile | None:
         """
         Get a specific expert by ID.
-        
+
         Args:
             expert_id: The unique identifier of the expert
-            
+
         Returns:
             The expert profile if found, None otherwise
         """
@@ -70,13 +69,13 @@ class ExpertRegistry:
     def get_or_raise(cls, expert_id: str) -> ExpertProfile:
         """
         Get a specific expert by ID, raising if not found.
-        
+
         Args:
             expert_id: The unique identifier of the expert
-            
+
         Returns:
             The expert profile
-            
+
         Raises:
             KeyError: If expert not found
         """
@@ -92,7 +91,7 @@ class ExpertRegistry:
     def list_all(cls) -> list[ExpertProfile]:
         """
         List all registered experts.
-        
+
         Returns:
             List of all registered expert profiles
         """
@@ -102,7 +101,7 @@ class ExpertRegistry:
     def list_ids(cls) -> list[str]:
         """
         List all registered expert IDs.
-        
+
         Returns:
             List of expert IDs
         """
@@ -111,20 +110,20 @@ class ExpertRegistry:
     @classmethod
     def filter_by(
         cls,
-        sector: Optional[str] = None,
-        style: Optional[str] = None,
-        market_cap: Optional[str] = None,
-        time_horizon: Optional[str] = None,
+        sector: str | None = None,
+        style: str | None = None,
+        market_cap: str | None = None,
+        time_horizon: str | None = None,
     ) -> list[ExpertProfile]:
         """
         Filter experts by various criteria.
-        
+
         Args:
             sector: Filter by applicable sector (e.g., "tech", "consumer")
             style: Filter by investment style (e.g., "value", "growth")
             market_cap: Filter by market cap preference (e.g., "large", "small")
             time_horizon: Filter by time horizon (e.g., "short", "long")
-            
+
         Returns:
             List of expert profiles matching all specified criteria
         """
@@ -134,21 +133,21 @@ class ExpertRegistry:
             if sector:
                 if "any" not in profile.applicable_sectors and sector not in profile.applicable_sectors:
                     continue
-            
+
             # Check style match
             if style and profile.style != style and profile.style != "hybrid":
                 continue
-            
+
             # Check market cap match
             if market_cap and profile.market_cap_preference != "any" and profile.market_cap_preference != market_cap:
                 continue
-            
+
             # Check time horizon match
             if time_horizon and profile.time_horizon != time_horizon:
                 continue
-            
+
             results.append(profile)
-        
+
         return results
 
     @classmethod
@@ -165,13 +164,13 @@ class ExpertRegistry:
 def register_expert(profile: ExpertProfile) -> ExpertProfile:
     """
     Decorator-style function to register an expert.
-    
+
     Can be used as:
         profile = register_expert(ExpertProfile(...))
-    
+
     Args:
         profile: The expert profile to register
-        
+
     Returns:
         The same profile (for chaining)
     """

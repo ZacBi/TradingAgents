@@ -29,13 +29,13 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 def _load_all_templates() -> dict[str, dict]:
     """从 YAML 文件加载全部模板，返回 {name: {template, label, ...}} 映射."""
-    from .registry import TEMPLATE_PATH_MAP, PROMPT_LABELS
+    from .registry import PROMPT_LABELS, TEMPLATE_PATH_MAP
 
     templates = {}
     for name, rel_path in TEMPLATE_PATH_MAP.items():
         yaml_path = _TEMPLATES_DIR / rel_path
         try:
-            with open(yaml_path, "r", encoding="utf-8") as f:
+            with open(yaml_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             templates[name] = {
                 "template": data.get("template", ""),
@@ -53,7 +53,7 @@ def upload_prompts(
     dry_run: bool = False,
 ) -> None:
     """Upload all fallback templates to Langfuse.
-    
+
     Args:
         public_key: Langfuse public key
         secret_key: Langfuse secret key
@@ -61,7 +61,7 @@ def upload_prompts(
         dry_run: If True, only print what would be uploaded
     """
     all_templates = _load_all_templates()
-    
+
     if dry_run:
         logger.info("DRY RUN - No prompts will be uploaded")
         for name, info in all_templates.items():
@@ -69,25 +69,25 @@ def upload_prompts(
             logger.info("  [%s] %s: %s...", info["label"], name, preview)
         logger.info("Total: %d prompts", len(all_templates))
         return
-    
+
     try:
         from langfuse import Langfuse
     except ImportError:
         logger.error("langfuse package not installed. Install with: pip install langfuse")
         sys.exit(1)
-    
+
     client = Langfuse(
         public_key=public_key,
         secret_key=secret_key,
         host=host,
     )
-    
+
     logger.info("Connected to Langfuse at %s", host)
     logger.info("Uploading %d prompts...", len(all_templates))
-    
+
     success_count = 0
     error_count = 0
-    
+
     for name, info in all_templates.items():
         label = info["label"]
         template = info["template"]
@@ -107,9 +107,9 @@ def upload_prompts(
             except Exception as update_exc:
                 logger.error("  Failed to upload %s: %s", name, update_exc)
                 error_count += 1
-    
+
     client.flush()
-    
+
     logger.info("")
     logger.info("Upload complete: %d success, %d errors", success_count, error_count)
 
@@ -138,9 +138,9 @@ def main():
         action="store_true",
         help="Print what would be uploaded without actually uploading",
     )
-    
+
     args = parser.parse_args()
-    
+
     if not args.dry_run:
         if not args.public_key or not args.secret_key:
             logger.error(
@@ -148,7 +148,7 @@ def main():
                 "environment variables, or use --public-key and --secret-key arguments."
             )
             sys.exit(1)
-    
+
     upload_prompts(
         public_key=args.public_key or "",
         secret_key=args.secret_key or "",

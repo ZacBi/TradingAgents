@@ -1,8 +1,12 @@
 # TradingAgents/graph/signal_processing.py
 
+import logging
+
 from langchain_openai import ChatOpenAI
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
+
+logger = logging.getLogger(__name__)
 
 
 class SignalProcessor:
@@ -28,5 +32,8 @@ class SignalProcessor:
             ("system", system_prompt),
             ("human", full_signal),
         ]
-
-        return self.quick_thinking_llm.invoke(messages).content
+        try:
+            return self.quick_thinking_llm.invoke(messages).content
+        except Exception:
+            logger.exception("SignalProcessor LLM invoke failed")
+            return "HOLD"

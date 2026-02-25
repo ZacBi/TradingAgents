@@ -7,7 +7,7 @@
 
 import json
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from tradingagents.prompts import PromptNames, get_prompt_manager
 
@@ -50,7 +50,7 @@ _DEFAULT_MOAT = {
 }
 
 
-def create_moat_analyzer(llm, prompt_manager: Optional[object] = None) -> Callable:
+def create_moat_analyzer(llm, prompt_manager: object | None = None) -> Callable:
     """创建护城河评估 Agent 节点。
 
     Args:

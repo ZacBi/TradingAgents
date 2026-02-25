@@ -11,7 +11,7 @@ from .deep_research import (
     DeepResearchTrigger,
     create_deep_research_agent,
 )
-from .providers.gemini import DeepResearchResult, GEMINI_AVAILABLE
+from .providers.gemini import GEMINI_AVAILABLE, DeepResearchResult
 from .providers.openai import OPENAI_AVAILABLE
 
 __all__ = [

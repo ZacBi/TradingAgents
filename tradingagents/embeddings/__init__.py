@@ -10,28 +10,27 @@ Supports multiple providers:
 """
 
 import logging
-from typing import Optional
 
 from .base import EmbeddingProvider
-from .sentence_transformers import (
-    SentenceTransformersProvider,
-    create_sentence_transformers_provider,
-    SENTENCE_TRANSFORMERS_AVAILABLE,
-)
-from .openai import (
-    OpenAIEmbeddingProvider,
-    create_openai_embedding_provider,
-    OPENAI_AVAILABLE,
-)
 from .google import (
+    GOOGLE_AVAILABLE,
     GoogleEmbeddingProvider,
     create_google_embedding_provider,
-    GOOGLE_AVAILABLE,
 )
 from .litellm import (
+    LITELLM_AVAILABLE,
     LiteLLMEmbeddingProvider,
     create_litellm_embedding_provider,
-    LITELLM_AVAILABLE,
+)
+from .openai import (
+    OPENAI_AVAILABLE,
+    OpenAIEmbeddingProvider,
+    create_openai_embedding_provider,
+)
+from .sentence_transformers import (
+    SENTENCE_TRANSFORMERS_AVAILABLE,
+    SentenceTransformersProvider,
+    create_sentence_transformers_provider,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,19 +49,43 @@ __all__ = [
 ]
 
 
-def create_embedding_provider(config: dict) -> Optional[EmbeddingProvider]:
+_EMBEDDING_CREATORS = {
+    "sentence_transformers": create_sentence_transformers_provider,
+    "openai": create_openai_embedding_provider,
+    "google": create_google_embedding_provider,
+    "litellm": create_litellm_embedding_provider,
+}
+
+_FALLBACK_ORDER = [
+    ("sentence_transformers", SENTENCE_TRANSFORMERS_AVAILABLE, create_sentence_transformers_provider),
+    ("litellm", LITELLM_AVAILABLE, create_litellm_embedding_provider),
+    ("openai", OPENAI_AVAILABLE, create_openai_embedding_provider),
+    ("google", GOOGLE_AVAILABLE, create_google_embedding_provider),
+]
+
+
+def _try_create_provider(config: dict, name: str):
+    """Create provider by name; return instance or None."""
+    creator = _EMBEDDING_CREATORS.get(name)
+    if creator is None:
+        logger.warning("Unknown embedding provider: %s", name)
+        return None
+    return creator(config)
+
+
+def create_embedding_provider(config: dict) -> EmbeddingProvider | None:
     """
     Factory function to create an embedding provider based on configuration.
-    
+
     Args:
         config: Configuration dictionary with keys:
-            - embedding_provider: Provider name 
+            - embedding_provider: Provider name
               ("sentence_transformers", "openai", "google", "litellm")
             - embedding_model: Model name (provider-specific)
-            
+
     Returns:
         EmbeddingProvider instance or None if creation fails
-        
+
     Provider priority (if specified provider fails):
     1. sentence_transformers (local, no cost)
     2. litellm (if available)
@@ -70,56 +93,17 @@ def create_embedding_provider(config: dict) -> Optional[EmbeddingProvider]:
     4. google
     """
     provider_name = config.get("embedding_provider", "sentence_transformers")
-    
-    # Try to create the requested provider
-    provider = None
-    
-    if provider_name == "sentence_transformers":
-        provider = create_sentence_transformers_provider(config)
-    elif provider_name == "openai":
-        provider = create_openai_embedding_provider(config)
-    elif provider_name == "google":
-        provider = create_google_embedding_provider(config)
-    elif provider_name == "litellm":
-        provider = create_litellm_embedding_provider(config)
-    else:
-        logger.warning("Unknown embedding provider: %s", provider_name)
-    
-    # If requested provider failed, try fallbacks
-    if provider is None:
-        logger.warning(
-            "Failed to create %s provider, trying fallbacks", provider_name
-        )
-        
-        # Try sentence_transformers first (free, local)
-        if SENTENCE_TRANSFORMERS_AVAILABLE:
-            provider = create_sentence_transformers_provider(config)
-            if provider:
-                logger.info("Fell back to sentence_transformers")
-                return provider
-        
-        # Try LiteLLM
-        if LITELLM_AVAILABLE:
-            provider = create_litellm_embedding_provider(config)
-            if provider:
-                logger.info("Fell back to litellm")
-                return provider
-        
-        # Try OpenAI
-        if OPENAI_AVAILABLE:
-            provider = create_openai_embedding_provider(config)
-            if provider:
-                logger.info("Fell back to openai")
-                return provider
-        
-        # Try Google
-        if GOOGLE_AVAILABLE:
-            provider = create_google_embedding_provider(config)
-            if provider:
-                logger.info("Fell back to google")
-                return provider
-        
-        logger.error("No embedding provider available")
-        return None
-    
-    return provider
+    provider = _try_create_provider(config, provider_name)
+    if provider is not None:
+        return provider
+
+    logger.warning("Failed to create %s provider, trying fallbacks", provider_name)
+    for name, available, creator in _FALLBACK_ORDER:
+        if not available:
+            continue
+        provider = creator(config)
+        if provider is not None:
+            logger.info("Fell back to %s", name)
+            return provider
+    logger.error("No embedding provider available")
+    return None

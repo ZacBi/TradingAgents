@@ -2,7 +2,6 @@
 """LiteLLM unified embedding provider."""
 
 import logging
-from typing import Optional
 
 from .base import EmbeddingProvider
 
@@ -18,7 +17,7 @@ except ImportError:
 class LiteLLMEmbeddingProvider(EmbeddingProvider):
     """
     LiteLLM unified embedding provider.
-    
+
     Supports multiple providers through LiteLLM's unified interface:
     - openai/text-embedding-3-small
     - google/text-embedding-004
@@ -33,7 +32,7 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
     ):
         """
         Initialize the LiteLLM embedding provider.
-        
+
         Args:
             model_name: Model in LiteLLM format (provider/model)
             dimension: Expected embedding dimension
@@ -42,10 +41,10 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
             raise ImportError(
                 "litellm package is required. Install with: pip install litellm"
             )
-        
+
         self._model_name = model_name
         self._dimension = dimension
-        
+
         logger.info(
             "Initialized LiteLLM embeddings with model=%s, dim=%d",
             model_name, dimension
@@ -78,24 +77,24 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
 
 def create_litellm_embedding_provider(
     config: dict,
-) -> Optional[LiteLLMEmbeddingProvider]:
+) -> LiteLLMEmbeddingProvider | None:
     """
     Factory function to create a LiteLLM embedding provider.
-    
+
     Args:
         config: Configuration dictionary with keys:
             - embedding_model: Model in LiteLLM format
             - embedding_dimension: Expected dimension (default: 1536)
-            
+
     Returns:
         Provider instance or None if not available
     """
     if not LITELLM_AVAILABLE:
         return None
-    
+
     model_name = config.get("embedding_model", "openai/text-embedding-3-small")
     dimension = config.get("embedding_dimension", 1536)
-    
+
     try:
         return LiteLLMEmbeddingProvider(model_name=model_name, dimension=dimension)
     except ImportError as e:

@@ -33,7 +33,7 @@ def get_realtime_quote(
     - HK: Hong Kong stocks (e.g., 0700 for Tencent, 9988 for Alibaba)
     - CN: China A-shares (e.g., 000001 for Ping An, 600519 for Moutai)
 
-    Note: Requires Longport API credentials (LONGPORT_APP_KEY, LONGPORT_APP_SECRET, 
+    Note: Requires Longport API credentials (LONGPORT_APP_KEY, LONGPORT_APP_SECRET,
     LONGPORT_ACCESS_TOKEN).
 
     Args:

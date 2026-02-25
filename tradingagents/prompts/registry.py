@@ -4,37 +4,37 @@
 
 class PromptNames:
     """Standardized prompt names for the TradingAgents system.
-    
+
     Naming convention: {category}-{role}
     Categories: expert, analyst, researcher, manager, risk, trader
     """
-    
+
     # Expert Prompts (5)
     EXPERT_BUFFETT = "expert-buffett"
     EXPERT_MUNGER = "expert-munger"
     EXPERT_LYNCH = "expert-lynch"
     EXPERT_LIVERMORE = "expert-livermore"
     EXPERT_GRAHAM = "expert-graham"
-    
+
     # Analyst Prompts (4)
     ANALYST_MARKET = "analyst-market"
     ANALYST_SOCIAL = "analyst-social"
     ANALYST_NEWS = "analyst-news"
     ANALYST_FUNDAMENTALS = "analyst-fundamentals"
-    
+
     # Researcher Prompts (2)
     RESEARCHER_BULL = "researcher-bull"
     RESEARCHER_BEAR = "researcher-bear"
-    
+
     # Manager Prompts (2)
     MANAGER_RESEARCH = "manager-research"
     MANAGER_RISK = "manager-risk"
-    
+
     # Risk Debator Prompts (3)
     RISK_AGGRESSIVE = "risk-aggressive"
     RISK_CONSERVATIVE = "risk-conservative"
     RISK_NEUTRAL = "risk-neutral"
-    
+
     # Trader Prompt (1)
     TRADER_MAIN = "trader-main"
 

@@ -158,6 +158,8 @@ skip-string-normalization = true
 [tool.ruff]
 line-length = 88
 target-version = "py313"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -168,8 +170,8 @@ select = [
     "UP", # pyupgrade
 ]
 extend-ignore = [
-    "E501", # line too long, handled by black
-    "B008", # do not perform function calls in argument defaults
+    "E501",   # line too long, handled by formatter
+    "B008",   # do not perform function calls in argument defaults
 ]
 
 [tool.mypy]

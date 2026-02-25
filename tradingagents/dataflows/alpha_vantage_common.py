@@ -1,11 +1,18 @@
-import os
-import requests
-import pandas as pd
 import json
+import os
 from datetime import datetime
 from io import StringIO
 
-API_BASE_URL = "https://www.alphavantage.co/query"
+import pandas as pd
+import requests
+
+from .config import get_config
+
+_DEFAULT_ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
+
+
+def _get_alpha_vantage_base_url() -> str:
+    return get_config().get("alpha_vantage_base_url", _DEFAULT_ALPHA_VANTAGE_BASE_URL)
 
 def get_api_key() -> str:
     """Retrieve the API key for Alpha Vantage from environment variables."""
@@ -28,8 +35,8 @@ def format_datetime_for_api(date_input) -> str:
             try:
                 dt = datetime.strptime(date_input, "%Y-%m-%d %H:%M")
                 return dt.strftime("%Y%m%dT%H%M")
-            except ValueError:
-                raise ValueError(f"Unsupported date format: {date_input}")
+            except ValueError as err:
+                raise ValueError(f"Unsupported date format: {date_input}") from err
     elif isinstance(date_input, datetime):
         return date_input.strftime("%Y%m%dT%H%M")
     else:
@@ -41,7 +48,7 @@ class AlphaVantageRateLimitError(Exception):
 
 def _make_api_request(function_name: str, params: dict) -> dict | str:
     """Helper function to make API requests and handle responses.
-    
+
     Raises:
         AlphaVantageRateLimitError: When API rate limit is exceeded
     """
@@ -52,22 +59,22 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
         "apikey": get_api_key(),
         "source": "trading_agents",
     })
-    
+
     # Handle entitlement parameter if present in params or global variable
     current_entitlement = globals().get('_current_entitlement')
     entitlement = api_params.get("entitlement") or current_entitlement
-    
+
     if entitlement:
         api_params["entitlement"] = entitlement
     elif "entitlement" in api_params:
         # Remove entitlement if it's None or empty
         api_params.pop("entitlement", None)
-    
-    response = requests.get(API_BASE_URL, params=api_params)
+
+    response = requests.get(_get_alpha_vantage_base_url(), params=api_params)
     response.raise_for_status()
 
     response_text = response.text
-    
+
     # Check if response is JSON (error responses are typically JSON)
     try:
         response_json = json.loads(response_text)

@@ -7,27 +7,26 @@
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable, Optional
 
+from .data_extractor import extract_financial_metrics
+from .moat_analyzer import create_moat_analyzer
 from .models import (
-    FinancialMetrics,
     DCFResult,
     GrahamNumberResult,
     ValuationResult,
     calculate_dcf,
     calculate_graham_number,
 )
-from .data_extractor import extract_financial_metrics
-from .moat_analyzer import create_moat_analyzer
 
 logger = logging.getLogger(__name__)
 
 
 def create_valuation_node(
     llm,
-    prompt_manager: Optional[object] = None,
-    config: Optional[dict] = None,
+    prompt_manager: object | None = None,
+    config: dict | None = None,
 ) -> Callable:
     """创建 Valuation Analyst 节点。
 
@@ -117,6 +116,64 @@ def create_valuation_node(
     return valuation_node
 
 
+def _dcf_upside_score(dcf_upside: float) -> int:
+    """DCF upside 百分制评分."""
+    if dcf_upside > 50:
+        return 90
+    if dcf_upside > 30:
+        return 75
+    if dcf_upside > 10:
+        return 55
+    if dcf_upside > 0:
+        return 40
+    return 20
+
+
+def _graham_mos_score(graham_mos: float) -> int:
+    """Graham margin of safety 百分制评分."""
+    if graham_mos > 0.30:
+        return 90
+    if graham_mos > 0.10:
+        return 70
+    if graham_mos > 0:
+        return 50
+    return 25
+
+
+def _moat_bonus(moat: dict | None) -> int:
+    """Moat 评级加权分."""
+    if not moat:
+        return 0
+    rating = moat.get("moat_rating", "None")
+    if rating == "Wide":
+        return 15
+    if rating == "Narrow":
+        return 5
+    return 0
+
+
+def _score_to_recommendation(avg_score: float) -> str:
+    """平均分映射到买卖建议."""
+    if avg_score >= 80:
+        return "Strong Buy"
+    if avg_score >= 60:
+        return "Buy"
+    if avg_score >= 40:
+        return "Hold"
+    return "Sell"
+
+
+def _synthesize_confidence(
+    available: int, moat: dict | None, scores: list[int]
+) -> str:
+    """根据数据完整性与信号一致性得到置信度."""
+    if available >= 2 and moat is not None and scores and (max(scores) - min(scores) < 30):
+        return "High"
+    if available >= 1:
+        return "Medium"
+    return "Low"
+
+
 def _synthesize_recommendation(
     dcf: DCFResult | None,
     graham: GrahamNumberResult | None,
@@ -127,75 +184,25 @@ def _synthesize_recommendation(
     Returns:
         (recommendation, confidence) 元组
     """
-    # 提取指标
     dcf_upside = dcf["upside_pct"] if dcf else None
     graham_mos = graham["margin_of_safety"] if graham else None
     moat_rating = moat.get("moat_rating", "None") if moat else "None"
-
-    # 计算可用指标数
     available = sum(1 for x in [dcf_upside, graham_mos] if x is not None)
     has_moat = moat is not None and moat_rating != "None"
 
-    # 所有指标缺失
     if available == 0 and not has_moat:
         return "Hold", "Low"
 
-    # 量化评分 (百分制)
     scores = []
-
     if dcf_upside is not None:
-        if dcf_upside > 50:
-            scores.append(90)
-        elif dcf_upside > 30:
-            scores.append(75)
-        elif dcf_upside > 10:
-            scores.append(55)
-        elif dcf_upside > 0:
-            scores.append(40)
-        else:
-            scores.append(20)
-
+        scores.append(_dcf_upside_score(dcf_upside))
     if graham_mos is not None:
-        if graham_mos > 0.30:
-            scores.append(90)
-        elif graham_mos > 0.10:
-            scores.append(70)
-        elif graham_mos > 0:
-            scores.append(50)
-        else:
-            scores.append(25)
+        scores.append(_graham_mos_score(graham_mos))
 
-    # Moat 加权
-    moat_bonus = 0
-    if moat_rating == "Wide":
-        moat_bonus = 15
-    elif moat_rating == "Narrow":
-        moat_bonus = 5
-
-    avg_score = (sum(scores) / len(scores) + moat_bonus) if scores else (40 + moat_bonus)
-
-    # 映射到推荐
-    if avg_score >= 80:
-        recommendation = "Strong Buy"
-    elif avg_score >= 60:
-        recommendation = "Buy"
-    elif avg_score >= 40:
-        recommendation = "Hold"
-    else:
-        recommendation = "Sell"
-
-    # 置信度：取决于数据完整性和信号一致性
-    if available >= 2 and moat is not None:
-        # 检查信号一致性
-        if scores and (max(scores) - min(scores) < 30):
-            confidence = "High"
-        else:
-            confidence = "Medium"
-    elif available >= 1:
-        confidence = "Medium"
-    else:
-        confidence = "Low"
-
+    bonus = _moat_bonus(moat)
+    avg_score = (sum(scores) / len(scores) + bonus) if scores else (40 + bonus)
+    recommendation = _score_to_recommendation(avg_score)
+    confidence = _synthesize_confidence(available, moat, scores)
     return recommendation, confidence
 
 

@@ -3,6 +3,9 @@ import os
 DEFAULT_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", "./results"),
+    "eval_log_dir": os.getenv("TRADINGAGENTS_EVAL_LOG_DIR", "eval_results"),
+    "alpha_vantage_base_url": "https://www.alphavantage.co/query",
+    "litellm_base_url": os.getenv("LITELLM_BASE_URL", "http://localhost:4000"),
     "data_cache_dir": os.path.join(
         os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
         "dataflows/data_cache",

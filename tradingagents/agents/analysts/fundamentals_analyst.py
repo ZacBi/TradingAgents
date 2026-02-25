@@ -1,8 +1,12 @@
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-import time
-import json
-from tradingagents.agents.utils.agent_utils import get_fundamentals, get_balance_sheet, get_cashflow, get_income_statement, get_insider_transactions
-from tradingagents.dataflows.config import get_config
+
+from tradingagents.agents.utils.agent_utils import (
+    get_balance_sheet,
+    get_cashflow,
+    get_fundamentals,
+    get_income_statement,
+)
 from tradingagents.prompts import PromptNames, get_prompt_manager
 
 
@@ -12,7 +16,7 @@ def create_fundamentals_analyst(llm):
     def fundamentals_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
-        company_name = state["company_of_interest"]
+        state["company_of_interest"]
 
         tools = [
             get_fundamentals,

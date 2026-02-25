@@ -7,7 +7,6 @@ and provides role-based model resolution for agent nodes.
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -15,10 +14,10 @@ import yaml
 class ModelRoutingConfig:
     """Resolves agent role types to concrete model names via YAML profiles."""
 
-    def __init__(self, config_path: str, active_profile: Optional[str] = None):
+    def __init__(self, config_path: str, active_profile: str | None = None):
         raw = self._load_yaml(config_path)
-        self.aliases: Dict[str, str] = raw.get("model_aliases", {})
-        self.profiles: Dict[str, dict] = raw.get("profiles", {})
+        self.aliases: dict[str, str] = raw.get("model_aliases", {})
+        self.profiles: dict[str, dict] = raw.get("profiles", {})
         self.active_profile: str = active_profile or raw.get("active_profile", "balanced")
 
         if self.active_profile not in self.profiles:
@@ -48,13 +47,13 @@ class ModelRoutingConfig:
         raw_value = profile[role_type]
         return self._resolve(raw_value)
 
-    def get_fallback_chain(self) -> List[str]:
+    def get_fallback_chain(self) -> list[str]:
         """Return the resolved fallback model chain for the active profile."""
         profile = self.profiles[self.active_profile]
         raw_chain = profile.get("fallback_chain", [])
         return [self._resolve(v) for v in raw_chain]
 
-    def list_profiles(self) -> List[str]:
+    def list_profiles(self) -> list[str]:
         """Return all available profile names."""
         return list(self.profiles.keys())
 
@@ -75,13 +74,13 @@ class ModelRoutingConfig:
 
     @staticmethod
     def _load_yaml(path: str) -> dict:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
 
 def load_model_routing(
-    config_path: Optional[str] = None,
-    active_profile: Optional[str] = None,
+    config_path: str | None = None,
+    active_profile: str | None = None,
 ) -> ModelRoutingConfig:
     """Convenience loader that searches common locations.
 
