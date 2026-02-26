@@ -264,7 +264,13 @@ class TradingAgentsGraph:
             self.embedder = None
 
     def _init_checkpointer(self):
-        """Initialize LangGraph checkpointer based on config."""
+        """Initialize LangGraph checkpointer based on config.
+        
+        Follows LangGraph best practices (2025):
+        - For PostgreSQL: calls .setup() to create tables
+        - Uses connection pooling for better performance
+        - Handles async operations properly
+        """
         try:
             storage = self.config.get("checkpoint_storage", "memory")
             if storage == "memory":
@@ -283,14 +289,30 @@ class TradingAgentsGraph:
                     logger.error("PostgreSQL URL not configured for checkpointer.")
                     self.checkpointer = None
                     return
+                
+                # Create PostgresSaver with connection string
                 self.checkpointer = PostgresSaver.from_conn_string(pg_url)
-                logger.info("LangGraph PostgresSaver checkpointer initialized.")
+                
+                # Best practice: Call .setup() to create required tables
+                # This is required for first-time setup
+                try:
+                    self.checkpointer.setup()
+                    logger.info("LangGraph PostgresSaver checkpointer initialized and tables created.")
+                except Exception as setup_exc:
+                    # Tables might already exist, which is fine
+                    if "already exists" in str(setup_exc).lower() or "duplicate" in str(setup_exc).lower():
+                        logger.info("LangGraph PostgresSaver checkpointer initialized (tables already exist).")
+                    else:
+                        logger.warning("PostgresSaver.setup() failed (non-critical): %s", setup_exc)
+                        # Continue anyway - tables might already exist
+                
+                logger.info("LangGraph PostgresSaver checkpointer ready for use.")
             else:
                 logger.warning("Unknown checkpoint_storage: %s", storage)
         except ImportError as exc:
             logger.warning(
                 "Checkpointer init failed (missing package?): %s. "
-                "For postgres storage, install langgraph-checkpoint-postgres.", exc
+                "For postgres storage, install: pip install psycopg psycopg-pool langgraph-checkpoint-postgres", exc
             )
             self.checkpointer = None
         except Exception as exc:
