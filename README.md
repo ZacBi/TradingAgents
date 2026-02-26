@@ -107,15 +107,14 @@ git clone https://github.com/TauricResearch/TradingAgents.git
 cd TradingAgents
 ```
 
-Create a virtual environment in any of your favorite environment managers:
-```bash
-conda create -n tradingagents python=3.13
-conda activate tradingagents
-```
+Install with **uv** (recommended) or pip:
 
-Install dependencies:
 ```bash
-pip install -r requirements.txt
+# Using uv (recommended)
+uv sync
+
+# Or with pip
+pip install -e .
 ```
 
 ### Required APIs
@@ -140,11 +139,11 @@ cp .env.example .env
 
 ### CLI Usage
 
-You can also try out the CLI directly by running:
+Run the CLI (interactive analysis):
 ```bash
-python -m cli.main
+uv run tradingagents analyze
 ```
-You will see a screen where you can select your desired tickers, date, LLMs, research depth, etc.
+Or after install: `tradingagents analyze`. You will see a screen where you can select your desired tickers, date, LLMs, research depth, etc.
 
 <p align="center">
   <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
@@ -168,24 +167,22 @@ We built TradingAgents with LangGraph to ensure flexibility and modularity. The 
 
 ### Python Usage
 
-To use TradingAgents inside your code, you can import the `tradingagents` module and initialize a `TradingAgentsGraph()` object. The `.propagate()` function will return a decision. You can run `main.py`, here's also a quick example:
+To use TradingAgents inside your code, import the `tradingagents` module and initialize a `TradingAgentsGraph()`. The `.propagate()` method returns a decision. Example:
 
 ```python
+from tradingagents.config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
 
 ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
-
-# forward propagate
 _, decision = ta.propagate("NVDA", "2026-01-15")
 print(decision)
 ```
 
-You can also adjust the default configuration to set your own choice of LLMs, debate rounds, etc.
+To customize LLM provider, models, and debate rounds:
 
 ```python
+from tradingagents.config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
 
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"] = "openai"        # openai, google, anthropic, xai, openrouter, ollama
@@ -198,17 +195,19 @@ _, decision = ta.propagate("NVDA", "2026-01-15")
 print(decision)
 ```
 
-See `tradingagents/default_config.py` for all configuration options.
+See `tradingagents.config` (e.g. `DEFAULT_CONFIG` in `config.defaults`) for all configuration options. A minimal run script is in `scripts/run_single_propagate.py`.
 
 ### Optional: Backtest and Dashboard
 
 - **Backtest**: Run a backtest from persisted decisions (SQLite or CSV):  
-  `python -m cli.main backtest --ticker AAPL --start 2024-01-01 --end 2024-12-31`  
+  `uv run tradingagents backtest --ticker AAPL --start 2024-01-01 --end 2024-12-31`  
   Use `--db-path` for the SQLite DB or `--csv path/to/decisions.csv` (columns: ticker, trade_date, final_decision).
 
-- **Streamlit Dashboard**: Install with `uv sync --extra dashboard` (or pip install streamlit plotly altair), then:  
-  `uv run streamlit run dashboard/app.py`  
-  View agent decisions, daily NAV curve, and run statistics.
+- **Dashboard**: The dashboard is built with **Streamlit** (open source). Install optional dependencies with `uv sync --extra dashboard` (or `pip install streamlit plotly altair`), then run:
+  ```bash
+  uv run streamlit run dashboard/app.py
+  ```
+  You can view agent decisions (with ticker and date range filters, and decision distribution), daily NAV and cumulative return (with date range), and run statistics. Set `TRADINGAGENTS_DB_PATH` to point to your SQLite database if it is not the default `tradingagents.db`.
 
 ## Contributing
 

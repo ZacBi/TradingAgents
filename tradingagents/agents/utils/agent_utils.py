@@ -27,6 +27,7 @@ from tradingagents.agents.utils.technical_indicators_tools import get_indicators
 from tradingagents.agents.utils.valuation_data_tools import (
     get_earnings_dates,
     get_institutional_holders,
+    get_valuation_metrics,
 )
 
 
