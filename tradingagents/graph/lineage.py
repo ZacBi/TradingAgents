@@ -35,7 +35,7 @@ def append_data_id(data_type: str, data_id: int) -> None:
 
 def _get_db():
     """Get DatabaseManager from config or create one (cached by path)."""
-    from tradingagents.dataflows.config import get_config
+    from tradingagents.config import get_config
     config = get_config()
     if not config.get("database_enabled"):
         return None

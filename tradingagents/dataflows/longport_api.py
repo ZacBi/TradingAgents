@@ -47,7 +47,7 @@ def _get_quote_context() -> "QuoteContext":
         access_token = os.getenv("LONGPORT_ACCESS_TOKEN")
 
         if not all([app_key, app_secret, access_token]):
-            from .config import get_config
+            from tradingagents.config import get_config
             config = get_config()
             app_key = app_key or config.get("longport_app_key")
             app_secret = app_secret or config.get("longport_app_secret")

@@ -17,10 +17,10 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from cli.announcements import display_announcements, fetch_announcements
-from cli.console import console
-from cli.stats_handler import StatsCallbackHandler
-from cli.utils import (
+from tradingagents.cli.announcements import display_announcements, fetch_announcements
+from tradingagents.cli.console import console
+from tradingagents.cli.stats_handler import StatsCallbackHandler
+from tradingagents.cli.utils import (
     ask_gemini_thinking_config,
     ask_openai_reasoning_effort,
     get_analysis_date,
@@ -31,7 +31,7 @@ from cli.utils import (
     select_research_depth,
     select_shallow_thinking_agent,
 )
-from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
 app = typer.Typer(
@@ -425,7 +425,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
     # Display ASCII art welcome message
-    with open("./cli/static/welcome.txt") as f:
+    with open(Path(__file__).resolve().parent / "static" / "welcome.txt") as f:
         welcome_ascii = f.read()
 
     # Create welcome box content

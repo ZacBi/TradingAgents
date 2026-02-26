@@ -97,7 +97,7 @@ except ImportError:
     get_longport_kline = None
 
 # Configuration and routing logic
-from .config import get_config
+from tradingagents.config import get_config
 
 # Tools organized by category
 TOOLS_CATEGORIES = {

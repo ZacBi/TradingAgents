@@ -41,7 +41,7 @@ def _get_fred_client() -> "Fred":
         # Try environment variable first, then config
         api_key = os.getenv("FRED_API_KEY")
         if not api_key:
-            from .config import get_config
+            from tradingagents.config import get_config
             api_key = get_config().get("fred_api_key")
 
         if not api_key:

@@ -440,6 +440,6 @@ def get_settings() -> Settings:
 
 def get_config() -> dict:
     """Return env-based config as dict (sanitized: secrets masked).
-    Use dataflows.config.get_config() for runtime graph config.
+    For runtime graph config use get_config from this package (tradingagents.config).
     """
     return get_settings().to_dict(safe=True)

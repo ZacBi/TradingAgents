@@ -6,7 +6,7 @@ from io import StringIO
 import pandas as pd
 import requests
 
-from .config import get_config
+from tradingagents.config import get_config
 
 _DEFAULT_ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
 

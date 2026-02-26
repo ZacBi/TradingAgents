@@ -212,7 +212,7 @@ def _get_stock_stats_bulk(
     """
     import pandas as pd
 
-    from .config import get_config
+    from tradingagents.config import get_config
     from .stockstats_utils import calculate_indicator
 
     config = get_config()

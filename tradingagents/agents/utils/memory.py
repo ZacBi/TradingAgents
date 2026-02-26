@@ -240,7 +240,7 @@ def create_embedder(config: dict) -> Callable[[str], list[float]] | None:
 
 if __name__ == "__main__":
     # Example usage with InMemoryStore
-    from tradingagents.default_config import DEFAULT_CONFIG
+    from tradingagents.config import DEFAULT_CONFIG
 
     config = DEFAULT_CONFIG.copy()
     config["store_backend"] = "memory"

@@ -35,8 +35,7 @@ from tradingagents.agents.utils.memory import (
     create_embedder,
     create_memory_store,
 )
-from tradingagents.dataflows.config import set_config
-from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.config import DEFAULT_CONFIG, set_config
 from tradingagents.llm_clients import create_llm_client
 
 from .conditional_logic import ConditionalLogic
@@ -388,7 +387,7 @@ class TradingAgentsGraph:
         from tradingagents.graph.lineage import get_data_ids, set_lineage_collector
         set_lineage_collector([])
         if self.config.get("database_enabled") and self.db:
-            from tradingagents.dataflows.config import set_config
+            from tradingagents.config import set_config
             set_config({**self.config, "db": self.db})
 
         # Initialize state

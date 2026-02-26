@@ -1,8 +1,8 @@
 
 import questionary
 
-from cli.console import console
-from cli.models import AnalystType
+from tradingagents.cli.console import console
+from tradingagents.cli.models import AnalystType
 
 ANALYST_ORDER = [
     ("Market Analyst", AnalystType.MARKET),

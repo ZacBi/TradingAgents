@@ -71,7 +71,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.2.1",
     "sqlalchemy>=2.0.0",
-    "alembic>=1.13.0",
+    "alembic>=1.13.0"
 ]
 
 [project.urls]
@@ -125,15 +125,14 @@ docs = [
 ]
 
 [project.scripts]
-tradingagents = "cli.main:app"
+tradingagents = "tradingagents.cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["tradingagents*", "cli*"]
+include = ["tradingagents*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-tradingagents = ["py.typed", "**/*.yaml", "**/*.json", "**/*.txt"]
-cli = ["static/*"]
+tradingagents = ["py.typed", "**/*.yaml", "**/*.json", "**/*.txt", "cli/static/*"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

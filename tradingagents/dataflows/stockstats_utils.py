@@ -11,7 +11,7 @@ import pandas as pd
 import pandas_ta as ta
 import yfinance as yf
 
-from .config import get_config
+from tradingagents.config import get_config
 
 logger = logging.getLogger(__name__)
 
