@@ -154,60 +154,42 @@ graph TB
 | **日志** | structlog | logging | 结构化日志，易分析 |
 | **监控** | Prometheus + Grafana | - | 标准方案 |
 
-## 3. API设计规范
+## 3. API设计规范（简化版）
 
-### 3.1 API端点设计
+### 3.1 核心API端点
 
-#### 3.1.1 分析服务API
+基于三个核心需求，API设计聚焦于：
 
-| 端点 | 方法 | 功能 | 请求参数 | 响应 |
-|:----|:----|:----|:--------|:----|
-| `/api/v1/analysis/start` | POST | 启动分析任务 | `ticker`, `date`, `analysts[]`, `config` | `task_id`, `status` |
-| `/api/v1/analysis/{task_id}` | GET | 获取分析状态 | - | `status`, `progress`, `result` |
-| `/api/v1/analysis/{task_id}/stream` | WebSocket | 实时流式更新 | - | `chunk` (SSE/WebSocket) |
-| `/api/v1/analysis/{task_id}/cancel` | POST | 取消分析任务 | - | `status` |
-| `/api/v1/analysis/history` | GET | 获取历史分析 | `ticker?`, `start_date?`, `end_date?`, `limit?` | `decisions[]` |
-| `/api/v1/analysis/{decision_id}` | GET | 获取决策详情 | - | `decision`, `reports`, `data_links` |
-
-#### 3.1.2 交易服务API
+#### 3.1.1 用户信息与持仓API
 
 | 端点 | 方法 | 功能 | 请求参数 | 响应 |
 |:----|:----|:----|:--------|:----|
-| `/api/v1/trading/positions` | GET | 获取持仓列表 | - | `positions[]` |
-| `/api/v1/trading/positions/{ticker}` | GET | 获取单个持仓 | - | `position` |
-| `/api/v1/trading/orders` | GET | 获取订单列表 | `status?`, `ticker?` | `orders[]` |
-| `/api/v1/trading/orders` | POST | 创建订单 | `order` | `order_id`, `status` |
-| `/api/v1/trading/orders/{order_id}` | GET | 获取订单详情 | - | `order` |
-| `/api/v1/trading/orders/{order_id}/cancel` | POST | 取消订单 | - | `status` |
-| `/api/v1/trading/portfolio` | GET | 获取投资组合 | - | `portfolio`, `nav`, `returns` |
+| `/api/v1/portfolio` | GET | 获取投资组合概览 | - | `total_value`, `cash`, `positions_value`, `total_pnl`, `daily_return` |
+| `/api/v1/positions` | GET | 获取持仓列表 | - | `positions[]` (包含ticker, quantity, avg_cost, current_price, pnl) |
+| `/api/v1/nav` | GET | 获取NAV历史 | `start_date?`, `end_date?`, `limit?` | `nav_records[]` (用于绘制NAV曲线) |
 
-#### 3.1.3 数据服务API
+#### 3.1.2 Agent决策输出API
 
 | 端点 | 方法 | 功能 | 请求参数 | 响应 |
 |:----|:----|:----|:--------|:----|
-| `/api/v1/data/market/{ticker}` | GET | 获取市场数据 | `period?`, `interval?` | `price_data`, `indicators` |
-| `/api/v1/data/fundamentals/{ticker}` | GET | 获取基本面数据 | - | `fundamentals` |
-| `/api/v1/data/news/{ticker}` | GET | 获取新闻数据 | `limit?` | `news[]` |
-| `/api/v1/data/nav` | GET | 获取NAV数据 | `start_date?`, `end_date?` | `nav_records[]` |
-| `/api/v1/data/backtest` | POST | 运行回测 | `ticker`, `start_date`, `end_date`, `config` | `metrics`, `trades[]` |
+| `/api/v1/decisions` | GET | 获取决策列表 | `ticker?`, `start_date?`, `end_date?`, `limit?` | `decisions[]` (包含ticker, date, decision, confidence) |
+| `/api/v1/decisions/{decision_id}` | GET | 获取决策详情 | - | `decision` (包含所有Agent输出：market_report, sentiment_report, news_report, fundamentals_report, investment_plan, trader_plan, final_decision) |
 
-#### 3.1.4 任务服务API
+#### 3.1.3 信息流API
 
 | 端点 | 方法 | 功能 | 请求参数 | 响应 |
 |:----|:----|:----|:--------|:----|
-| `/api/v1/tasks` | GET | 获取任务列表 | `status?`, `type?` | `tasks[]` |
-| `/api/v1/tasks/{task_id}` | GET | 获取任务详情 | - | `task` |
-| `/api/v1/tasks/{task_id}/cancel` | POST | 取消任务 | - | `status` |
-| `/api/v1/tasks/schedule` | POST | 创建定时任务 | `schedule`, `config` | `task_id` |
-| `/api/v1/tasks/schedule/{task_id}` | DELETE | 删除定时任务 | - | `status` |
+| `/api/v1/datafeed` | GET | 获取实时数据流 | `limit?`, `type?` | `data_items[]` (包含type, ticker, data, timestamp) |
+| `/api/v1/datafeed/stream` | WebSocket | 实时数据流推送 | - | 实时推送新数据 |
 
-#### 3.1.5 监控服务API
+### 3.2 WebSocket事件设计（简化版）
 
-| 端点 | 方法 | 功能 | 请求参数 | 响应 |
-|:----|:----|:----|:--------|:----|
-| `/api/v1/monitoring/health` | GET | 健康检查 | - | `status`, `components` |
-| `/api/v1/monitoring/metrics` | GET | 获取指标 | `metric?`, `time_range?` | `metrics[]` |
-| `/api/v1/monitoring/logs` | GET | 获取日志 | `level?`, `limit?` | `logs[]` |
+| 事件类型 | 事件名称 | 数据格式 | 说明 |
+|:--------|:--------|:--------|:----|
+| **持仓更新** | `position:update` | `{ticker, position, pnl}` | 持仓变化、盈亏更新 |
+| **投资组合更新** | `portfolio:update` | `{total_value, cash, positions_value, total_pnl}` | 投资组合总览更新 |
+| **新决策** | `decision:new` | `{decision_id, ticker, date, decision}` | 新决策产生 |
+| **数据流更新** | `datafeed:new` | `{type, ticker, data, timestamp}` | 新数据流推送 |
 
 ### 3.2 WebSocket事件设计
 
@@ -251,131 +233,96 @@ class DecisionResult(BaseModel):
 
 ## 4. 前后端功能实现清单
 
-### 4.1 前端功能清单
+### 4.1 核心需求分析
 
-#### 4.1.1 核心功能
+基于单用户场景，核心需求聚焦于三个主要方面：
 
-| 功能模块 | 子功能 | 优先级 | 说明 |
-|:--------|:------|:------|:-----|
-| **简单认证** | API Key验证 | P1 | 简单的API Key验证（可选） |
-| **分析管理** | 创建分析任务 | P0 | 表单配置，参数选择 |
-| **分析管理** | 实时进度展示 | P0 | WebSocket流式更新 |
-| **分析管理** | 历史决策查看 | P0 | 列表、筛选、搜索 |
-| **分析管理** | 决策详情展示 | P0 | 完整报告、数据溯源 |
-| **交易管理** | 持仓查看 | P0 | 实时持仓、盈亏 |
-| **交易管理** | 订单管理 | P0 | 订单列表、状态跟踪 |
-| **交易管理** | 投资组合 | P0 | NAV曲线、收益分析 |
-| **数据可视化** | 图表展示 | P0 | 价格、指标、NAV曲线 |
-| **数据可视化** | 决策分布 | P1 | 饼图、柱状图 |
-| **任务调度** | 定时任务管理 | P1 | 创建、编辑、删除 |
-| **系统监控** | 健康状态 | P1 | 系统组件状态 |
-| **系统监控** | 性能指标 | P1 | 响应时间、资源使用 |
+| 需求类别 | 具体内容 | 说明 |
+|:--------|:--------|:-----|
+| **用户信息展示** | 持仓、盈亏、投资组合 | 实时显示交易状态和收益 |
+| **信息流展示** | 实时数据、市场数据、新闻 | 实时抓取的数据流展示 |
+| **Agent决策输出** | 分析结果、决策历史、报告 | Agent的各个决策输出展示 |
 
-#### 4.1.2 增强功能
+### 4.2 前端功能清单（简化版）
 
-| 功能模块 | 子功能 | 优先级 | 说明 |
-|:--------|:------|:------|:-----|
-| **报告管理** | 报告导出 | P1 | PDF、Excel、Markdown |
-| **报告管理** | 报告分享 | P2 | 链接分享 |
-| **配置管理** | 系统配置 | P1 | LLM选择、参数配置 |
-| **通知中心** | 消息通知 | P1 | 任务完成、错误告警 |
-| **通知中心** | 邮件通知 | P2 | 邮件推送 |
-| **移动端** | 响应式设计 | P1 | 移动端适配 |
-| **移动端** | PWA支持 | P2 | 离线访问 |
+#### 4.2.1 核心页面
 
-### 4.2 后端功能清单
+| 页面/模块 | 功能 | 优先级 | 说明 |
+|:--------|:----|:------|:-----|
+| **仪表盘（Dashboard）** | 概览信息 | P0 | 持仓总览、盈亏、NAV曲线 |
+| **持仓页面** | 持仓列表 | P0 | 实时持仓、盈亏、成本价 |
+| **信息流页面** | 实时数据流 | P0 | 市场数据、新闻、指标更新 |
+| **决策历史页面** | Agent决策列表 | P0 | 历史决策、筛选、搜索 |
+| **决策详情页面** | 决策报告 | P0 | 完整分析报告、各Agent输出 |
+| **实时监控** | WebSocket实时更新 | P0 | 持仓变化、新决策推送 |
 
-#### 4.2.1 核心功能
+#### 4.2.2 辅助功能
 
 | 功能模块 | 子功能 | 优先级 | 说明 |
 |:--------|:------|:------|:-----|
-| **API服务** | RESTful API | P0 | 完整API端点 |
-| **API服务** | WebSocket服务 | P0 | 实时推送 |
-| **API服务** | API文档 | P0 | OpenAPI/Swagger |
-| **简单认证** | API Key验证 | P1 | 简单的API Key验证（可选，单用户场景可省略） |
-| **分析服务** | 任务创建 | P0 | 异步任务处理 |
-| **分析服务** | 状态管理 | P0 | 任务状态跟踪 |
-| **分析服务** | 流式输出 | P0 | WebSocket/SSE推送 |
-| **交易服务** | 订单管理 | P0 | 订单CRUD |
-| **交易服务** | 持仓管理 | P0 | 持仓同步 |
-| **交易服务** | 风险控制 | P0 | 实时风控检查 |
+| **触发分析** | 创建分析任务 | P1 | 手动触发分析（可选） |
+| **配置管理** | 系统配置 | P2 | LLM选择、参数配置（可选） |
+| **数据导出** | 报告导出 | P2 | PDF、Excel导出（可选） |
+
+### 4.3 后端功能清单（简化版）
+
+#### 4.3.1 核心API
+
+| 功能模块 | 子功能 | 优先级 | 说明 |
+|:--------|:------|:------|:-----|
+| **API服务** | RESTful API | P0 | 核心API端点 |
+| **API服务** | WebSocket服务 | P0 | 实时推送（持仓、决策、数据流） |
+| **持仓API** | 获取持仓列表 | P0 | 实时持仓、盈亏 |
+| **持仓API** | 获取投资组合 | P0 | NAV、总资产、收益 |
+| **决策API** | 获取决策列表 | P0 | 历史决策、筛选 |
+| **决策API** | 获取决策详情 | P0 | 完整报告、各Agent输出 |
+| **数据流API** | 获取实时数据 | P0 | 市场数据、新闻、指标 |
+| **数据流API** | WebSocket数据流 | P0 | 实时推送数据更新 |
+| **分析服务** | 触发分析（可选） | P1 | 手动触发分析任务 |
+
+#### 4.3.2 辅助功能
+
+| 功能模块 | 子功能 | 优先级 | 说明 |
+|:--------|:------|:------|:-----|
 | **数据服务** | 数据查询 | P0 | 市场数据、基本面 |
-| **数据服务** | 缓存管理 | P0 | Redis缓存 |
-| **任务调度** | 定时任务 | P0 | APScheduler集成 |
-| **任务调度** | 任务队列 | P1 | Celery集成 |
-| **监控服务** | 健康检查 | P0 | 组件健康状态 |
-| **监控服务** | 指标收集 | P0 | Prometheus集成 |
-| **监控服务** | 日志管理 | P0 | 结构化日志 |
-
-#### 4.2.2 增强功能
-
-| 功能模块 | 子功能 | 优先级 | 说明 |
-|:--------|:------|:------|:-----|
-| **文件服务** | 报告生成 | P1 | PDF、Excel生成 |
-| **文件服务** | 文件存储 | P1 | 对象存储集成 |
-| **通知服务** | 消息推送 | P1 | WebSocket推送 |
-| **通知服务** | 邮件服务 | P2 | SMTP集成 |
-| **数据分析** | 统计分析 | P1 | 决策统计、性能分析 |
-| **数据分析** | 回测服务 | P1 | 回测引擎集成 |
+| **数据服务** | 缓存管理 | P1 | Redis缓存（可选） |
+| **任务调度** | 定时任务 | P1 | APScheduler集成（可选） |
+| **监控服务** | 健康检查 | P2 | 系统健康状态（可选） |
 
 ## 5. 实施路线图
 
-### 5.1 Phase 1: 基础API层（2-3周）
+### 5.1 Phase 1: 核心API层（1-2周）
 
 | 任务 | 优先级 | 预计时间 | 依赖 |
 |:----|:------|:--------|:-----|
-| 设计API规范 | P0 | 2天 | - |
-| 实现FastAPI基础框架 | P0 | 3天 | - |
-| 实现简单认证（可选） | P1 | 1天 | FastAPI框架 |
-| 实现分析服务API | P0 | 5天 | API框架 |
-| 实现数据服务API | P0 | 3天 | API框架 |
-| 实现WebSocket服务 | P0 | 3天 | API框架 |
+| 设计API规范 | P0 | 1天 | - |
+| 实现FastAPI基础框架 | P0 | 2天 | - |
+| 实现持仓/投资组合API | P0 | 2天 | API框架 |
+| 实现决策列表/详情API | P0 | 2天 | API框架 |
+| 实现信息流API | P0 | 2天 | API框架 |
+| 实现WebSocket服务 | P0 | 2天 | API框架 |
 | API文档生成 | P0 | 1天 | API完成 |
-| 单元测试 | P0 | 3天 | API完成 |
 
-### 5.2 Phase 2: 前端基础（2-3周）
-
-| 任务 | 优先级 | 预计时间 | 依赖 |
-|:----|:------|:--------|:-----|
-| 搭建前端项目 | P0 | 2天 | - |
-| 实现简单认证（可选） | P1 | 1天 | 后端API |
-| 实现分析任务创建 | P0 | 5天 | 后端API |
-| 实现实时进度展示 | P0 | 4天 | WebSocket |
-| 实现历史决策查看 | P0 | 3天 | 后端API |
-| 实现基础UI组件 | P0 | 3天 | UI框架 |
-| 集成测试 | P0 | 2天 | 功能完成 |
-
-### 5.3 Phase 3: 交易功能（2-3周）
+### 5.2 Phase 2: 前端核心页面（1-2周）
 
 | 任务 | 优先级 | 预计时间 | 依赖 |
 |:----|:------|:--------|:-----|
-| 实现交易服务API | P0 | 5天 | 后端框架 |
-| 实现持仓管理API | P0 | 3天 | 交易服务 |
-| 实现订单管理API | P0 | 3天 | 交易服务 |
-| 实现前端交易界面 | P0 | 5天 | 交易API |
-| 实现投资组合展示 | P0 | 3天 | 交易API |
-| 集成测试 | P0 | 2天 | 功能完成 |
+| 搭建前端项目 | P0 | 1天 | - |
+| 实现仪表盘页面 | P0 | 3天 | 后端API |
+| 实现持仓页面 | P0 | 2天 | 后端API |
+| 实现决策历史页面 | P0 | 2天 | 后端API |
+| 实现决策详情页面 | P0 | 2天 | 后端API |
+| 实现信息流页面 | P0 | 2天 | 后端API |
+| 集成WebSocket实时更新 | P0 | 2天 | WebSocket |
 
-### 5.4 Phase 4: 数据可视化（1-2周）
-
-| 任务 | 优先级 | 预计时间 | 依赖 |
-|:----|:------|:--------|:-----|
-| 实现图表组件 | P0 | 3天 | 图表库 |
-| 实现NAV曲线 | P0 | 2天 | 图表组件 |
-| 实现决策分布 | P1 | 2天 | 图表组件 |
-| 实现数据可视化 | P1 | 3天 | 数据API |
-| 性能优化 | P1 | 2天 | 功能完成 |
-
-### 5.5 Phase 5: 增强功能（2-3周）
+### 5.3 Phase 3: 数据可视化（1周）
 
 | 任务 | 优先级 | 预计时间 | 依赖 |
 |:----|:------|:--------|:-----|
-| 实现任务调度API | P1 | 3天 | 后端框架 |
-| 实现定时任务管理 | P1 | 3天 | 调度API |
-| 实现报告导出 | P1 | 3天 | 文件服务 |
-| 实现通知中心 | P1 | 3天 | WebSocket |
-| 实现移动端适配 | P1 | 4天 | 响应式设计 |
-| 性能优化 | P1 | 3天 | 功能完成 |
+| 实现NAV曲线图表 | P0 | 2天 | 图表库 |
+| 实现持仓盈亏展示 | P0 | 2天 | 图表组件 |
+| 实现信息流可视化 | P0 | 2天 | 图表组件 |
+| 性能优化 | P1 | 1天 | 功能完成 |
 
 ## 6. 关键技术决策
 
@@ -555,22 +502,19 @@ graph TB
 ### 12.2 实施优先级
 
 **P0（必须实现）**：
-- API层基础框架
-- 分析服务API
-- 前端基础功能
-- 实时通信（WebSocket）
+- 核心API（持仓、决策、信息流）
+- WebSocket实时推送
+- 前端核心页面（仪表盘、持仓、决策、信息流）
+- 数据可视化（NAV曲线、盈亏展示）
 
-**P1（重要）**：
-- 简单认证（API Key，可选）
-- 交易功能
-- 数据可视化
-- 任务调度
-- 监控告警
-
-**P2（可选）**：
-- 移动端支持
-- 高级分析
+**P1（可选增强）**：
+- 简单认证（API Key，如需远程访问）
+- 手动触发分析（如需要）
 - 报告导出
+
+**P2（未来扩展）**：
+- 移动端支持
+- 高级分析功能
 
 ### 12.3 预期收益
 
