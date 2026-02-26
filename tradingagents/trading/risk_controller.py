@@ -108,13 +108,29 @@ class RiskController:
         
         # Check 4: Options-specific risk (Greeks)
         if order.order_type.value in ["buy_call", "sell_call", "buy_put", "sell_put"]:
-            # For options, check Greeks if available
-            # This is a simplified check - real implementation would calculate Greeks
+            # For options, calculate Greeks if possible
+            greeks = self._calculate_option_greeks(order, portfolio_value)
+            
             if order.order_type.value in ["sell_call", "sell_put"]:
                 # Selling options requires more margin
-                margin_required = order_value * 1.5  # Higher margin for naked options
+                # Margin = max(option_value * 1.2, underlying_value * 0.2) for covered
+                # For naked: higher margin requirement
+                margin_multiplier = 1.5 if not self._is_covered_option(order, current_positions) else 1.2
+                margin_required = order_value * margin_multiplier
                 if margin_required > account_info.get("buying_power", 0):
                     return False, f"Insufficient margin for option selling. Required: ${margin_required:.2f}"
+            
+            # Check Greeks-based risk limits
+            if greeks:
+                # Limit delta exposure (simplified - would need portfolio-level delta)
+                max_delta = self.config.get("max_option_delta", 0.5)
+                if abs(greeks.get("delta", 0)) > max_delta:
+                    return False, f"Option delta ({greeks.get('delta', 0):.2f}) exceeds limit ({max_delta})"
+                
+                # Limit gamma exposure
+                max_gamma = self.config.get("max_option_gamma", 0.1)
+                if abs(greeks.get("gamma", 0)) > max_gamma:
+                    return False, f"Option gamma ({greeks.get('gamma', 0):.2f}) exceeds limit ({max_gamma})"
         
         # Check 5: Daily loss limit (simplified - would need to track daily P&L)
         # This would require tracking daily P&L, which is not implemented here
@@ -270,3 +286,69 @@ class RiskController:
             if pos.symbol == symbol:
                 return pos
         return None
+    
+    def _calculate_option_greeks(self, order: Any, portfolio_value: float) -> Optional[Dict[str, float]]:
+        """Calculate option Greeks if possible.
+        
+        Args:
+            order: Order object (should have option fields)
+            portfolio_value: Portfolio value for calculations
+            
+        Returns:
+            Dictionary with Greeks (delta, gamma, theta, vega) or None
+        """
+        # Check if order has option information
+        if not order.option_symbol and not (order.strike_price and order.expiration_date):
+            return None
+        
+        try:
+            # Try to use QuantLib if available
+            try:
+                import QuantLib as ql
+                # This is a placeholder - real implementation would:
+                # 1. Get current underlying price
+                # 2. Get volatility (from historical data or implied vol)
+                # 3. Get risk-free rate
+                # 4. Calculate Greeks using Black-Scholes or binomial model
+                
+                # For now, return None to indicate Greeks not calculated
+                # Real implementation would require:
+                # - Underlying price
+                # - Volatility data
+                # - Risk-free rate
+                # - Time to expiration
+                return None
+            except ImportError:
+                # QuantLib not available
+                self._logger.debug("QuantLib not available for Greeks calculation")
+                return None
+        except Exception as e:
+            self._logger.exception("Failed to calculate option Greeks: %s", e)
+            return None
+    
+    def _is_covered_option(self, order: Any, positions: List[Any]) -> bool:
+        """Check if option order is covered (has underlying position).
+        
+        Args:
+            order: Order object
+            positions: Current positions
+            
+        Returns:
+            True if covered, False otherwise
+        """
+        # For covered call: need to own underlying stock
+        if order.order_type.value == "sell_call":
+            # Extract underlying symbol from option symbol or use order.symbol
+            underlying_symbol = order.symbol  # Simplified - would need to parse option symbol
+            position = self._get_position_for_symbol(underlying_symbol, positions)
+            if position and position.quantity > 0:
+                return True
+        
+        # For protective put: need to own underlying stock
+        if order.order_type.value == "buy_put":
+            underlying_symbol = order.symbol
+            position = self._get_position_for_symbol(underlying_symbol, positions)
+            if position and position.quantity > 0:
+                return True
+        
+        return False

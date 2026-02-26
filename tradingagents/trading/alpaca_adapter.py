@@ -60,6 +60,7 @@ class AlpacaAdapter(TradingInterface):
             self.base_url = config.get("base_url", "https://api.alpaca.markets")
         
         self.client: Optional[TradingClient] = None
+        self._data_client = None  # Cached data client for market data
         self._connected = False
     
     def connect(self) -> bool:
@@ -88,6 +89,7 @@ class AlpacaAdapter(TradingInterface):
     def disconnect(self):
         """Disconnect from Alpaca API."""
         self.client = None
+        self._data_client = None
         self._connected = False
         self._logger.info("Disconnected from Alpaca API")
     
@@ -312,17 +314,18 @@ class AlpacaAdapter(TradingInterface):
             raise RuntimeError("Not connected to Alpaca API")
         
         try:
-            # Use Alpaca's market data API
-            from alpaca.data.historical import StockHistoricalDataClient
+            # Use cached data client or create one
+            if self._data_client is None:
+                from alpaca.data.historical import StockHistoricalDataClient
+                self._data_client = StockHistoricalDataClient(
+                    api_key=self.api_key,
+                    secret_key=self.api_secret,
+                )
+            
             from alpaca.data.requests import StockLatestQuoteRequest
             
-            data_client = StockHistoricalDataClient(
-                api_key=self.api_key,
-                secret_key=self.api_secret,
-            )
-            
             request = StockLatestQuoteRequest(symbol_or_symbols=[symbol])
-            quote = data_client.get_stock_latest_quote(request)
+            quote = self._data_client.get_stock_latest_quote(request)
             
             if quote and symbol in quote:
                 # Return mid price

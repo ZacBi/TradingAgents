@@ -361,10 +361,11 @@ class TradingAgentsGraph:
             risk_config = self.config.get("risk_config", {})
             self.risk_controller = RiskController(risk_config)
             
-            # Initialize order executor
+            # Initialize order executor (pass LLM for structured output parsing)
             self.order_executor = OrderExecutor(
                 trading_interface=self.trading_interface,
                 risk_controller=self.risk_controller,
+                llm=self.quick_thinking_llm,  # Use quick thinking LLM for parsing
             )
             
             # Initialize managers
@@ -496,11 +497,11 @@ class TradingAgentsGraph:
             # Phase 2: Try to recover state if available
             if self.recovery_engine and self.recovery_engine.can_recover(thread_id):
                 logger.info("Recovering state from checkpoint for thread_id: %s", thread_id)
-                recovered_state = self.recovery_engine.recover_state(thread_id)
+                recovered_state = self.recovery_engine.recover_state(thread_id, merge_with_initial=init_agent_state)
                 if recovered_state:
-                    # Merge recovered state with initial state
-                    init_agent_state.update(recovered_state)
-                    logger.info("State recovered successfully")
+                    # Use merged state
+                    init_agent_state = recovered_state
+                    logger.info("State recovered and merged successfully")
 
         args = self.propagator.get_graph_args(thread_id=thread_id)
 

@@ -106,11 +106,12 @@ class RecoveryEngine:
             self._logger.exception("Failed to list checkpoints: %s", e)
             return []
     
-    def recover_state(self, thread_id: str) -> Optional[AgentState]:
+    def recover_state(self, thread_id: str, merge_with_initial: Optional[AgentState] = None) -> Optional[AgentState]:
         """Recover agent state from latest checkpoint.
         
         Args:
             thread_id: Thread identifier
+            merge_with_initial: Optional initial state to merge with recovered state
             
         Returns:
             Recovered agent state or None if recovery failed
@@ -118,21 +119,101 @@ class RecoveryEngine:
         checkpoint = self.get_latest_checkpoint(thread_id)
         if not checkpoint:
             self._logger.info("No checkpoint found for thread_id: %s", thread_id)
-            return None
+            return merge_with_initial
         
         try:
             # Extract state from checkpoint
             # LangGraph checkpoints contain state in channel_values or values
-            state = checkpoint.get("values") or checkpoint.get("channel_values", {})
-            if not state:
+            recovered_state = checkpoint.get("values") or checkpoint.get("channel_values", {})
+            if not recovered_state:
                 self._logger.warning("Checkpoint found but no state values for thread_id: %s", thread_id)
-                return None
+                return merge_with_initial
+            
+            # If initial state provided, merge intelligently
+            if merge_with_initial:
+                merged_state = self._merge_states(merge_with_initial, recovered_state)
+                self._logger.info("Merged recovered state with initial state for thread_id: %s", thread_id)
+                return merged_state
             
             self._logger.info("Recovered state from checkpoint for thread_id: %s", thread_id)
-            return state
+            return recovered_state
         except Exception as e:
             self._logger.exception("Failed to recover state: %s", e)
-            return None
+            return merge_with_initial
+    
+    def _merge_states(self, initial_state: AgentState, recovered_state: AgentState) -> AgentState:
+        """Merge initial state with recovered state intelligently.
+        
+        Strategy:
+        - Keep initial state for immutable fields (company_of_interest, trade_date)
+        - Prefer recovered state for analysis results (reports, decisions)
+        - Merge debate states carefully (preserve history)
+        
+        Args:
+            initial_state: Initial state to merge
+            recovered_state: Recovered state from checkpoint
+            
+        Returns:
+            Merged state
+        """
+        merged = initial_state.copy()
+        
+        # Keep initial immutable fields
+        # company_of_interest and trade_date should come from initial state
+        
+        # Prefer recovered state for analysis results if they exist
+        report_fields = ["market_report", "sentiment_report", "news_report", "fundamentals_report"]
+        for field in report_fields:
+            if recovered_state.get(field) and not initial_state.get(field):
+                merged[field] = recovered_state[field]
+        
+        # Merge debate states - preserve history but allow continuation
+        if "investment_debate_state" in recovered_state:
+            recovered_debate = recovered_state["investment_debate_state"]
+            if "investment_debate_state" not in merged or not merged["investment_debate_state"].get("history"):
+                # If initial state has no debate history, use recovered
+                merged["investment_debate_state"] = recovered_debate
+            else:
+                # Merge debate histories
+                initial_debate = merged["investment_debate_state"]
+                merged["investment_debate_state"] = {
+                    "history": recovered_debate.get("history", initial_debate.get("history", "")),
+                    "bull_history": recovered_debate.get("bull_history", initial_debate.get("bull_history", "")),
+                    "bear_history": recovered_debate.get("bear_history", initial_debate.get("bear_history", "")),
+                    "current_response": recovered_debate.get("current_response", initial_debate.get("current_response", "")),
+                    "judge_decision": recovered_debate.get("judge_decision", initial_debate.get("judge_decision", "")),
+                    "count": recovered_debate.get("count", initial_debate.get("count", 0)),
+                }
+        
+        # Similar merge for risk_debate_state
+        if "risk_debate_state" in recovered_state:
+            recovered_risk = recovered_state["risk_debate_state"]
+            if "risk_debate_state" not in merged or not merged["risk_debate_state"].get("history"):
+                merged["risk_debate_state"] = recovered_risk
+            else:
+                initial_risk = merged["risk_debate_state"]
+                merged["risk_debate_state"] = {
+                    "history": recovered_risk.get("history", initial_risk.get("history", "")),
+                    "aggressive_history": recovered_risk.get("aggressive_history", initial_risk.get("aggressive_history", "")),
+                    "conservative_history": recovered_risk.get("conservative_history", initial_risk.get("conservative_history", "")),
+                    "neutral_history": recovered_risk.get("neutral_history", initial_risk.get("neutral_history", "")),
+                    "latest_speaker": recovered_risk.get("latest_speaker", initial_risk.get("latest_speaker", "")),
+                    "current_aggressive_response": recovered_risk.get("current_aggressive_response", initial_risk.get("current_aggressive_response", "")),
+                    "current_conservative_response": recovered_risk.get("current_conservative_response", initial_risk.get("current_conservative_response", "")),
+                    "current_neutral_response": recovered_risk.get("current_neutral_response", initial_risk.get("current_neutral_response", "")),
+                    "judge_decision": recovered_risk.get("judge_decision", initial_risk.get("judge_decision", "")),
+                    "count": recovered_risk.get("count", initial_risk.get("count", 0)),
+                }
+        
+        # Prefer recovered decisions if they exist
+        if recovered_state.get("investment_plan") and not merged.get("investment_plan"):
+            merged["investment_plan"] = recovered_state["investment_plan"]
+        if recovered_state.get("trader_investment_plan") and not merged.get("trader_investment_plan"):
+            merged["trader_investment_plan"] = recovered_state["trader_investment_plan"]
+        if recovered_state.get("final_trade_decision") and not merged.get("final_trade_decision"):
+            merged["final_trade_decision"] = recovered_state["final_trade_decision"]
+        
+        return merged
     
     def can_recover(self, thread_id: str) -> bool:
         """Check if recovery is possible for a thread.

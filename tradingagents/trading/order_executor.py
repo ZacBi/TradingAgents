@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 from tradingagents.agents.utils.agent_states import AgentState
 from tradingagents.trading import Order, OrderType, TradingInterface
+from tradingagents.trading.decision_parser import DecisionParser, TradeDecision
 from tradingagents.trading.risk_controller import RiskController
 
 logger = logging.getLogger(__name__)
@@ -23,15 +24,18 @@ class OrderExecutor:
         self,
         trading_interface: TradingInterface,
         risk_controller: RiskController,
+        llm=None,
     ):
         """Initialize order executor.
         
         Args:
             trading_interface: TradingInterface instance
             risk_controller: RiskController instance
+            llm: Optional LLM for structured output parsing
         """
         self.trading_interface = trading_interface
         self.risk_controller = risk_controller
+        self.decision_parser = DecisionParser(llm) if llm else None
         self._logger = logging.getLogger(__name__)
     
     def execute_order(
@@ -158,48 +162,54 @@ class OrderExecutor:
             final_decision = state.get("final_trade_decision", "")
             company_of_interest = state.get("company_of_interest", "")
             
-            # Parse decision (simplified - real implementation would use structured output)
-            # Expected format: "BUY 100 shares" or "SELL 50 shares" or "HOLD"
-            decision_upper = final_decision.upper()
+            # Parse decision using structured output or fallback parser
+            if self.decision_parser:
+                trade_decision = self.decision_parser.parse_decision(final_decision)
+            else:
+                # Fallback: create parser without LLM (uses manual parsing)
+                from tradingagents.trading.decision_parser import DecisionParser
+                parser = DecisionParser(None)
+                trade_decision = parser._parse_manually(final_decision)
             
-            if "HOLD" in decision_upper or "NO ACTION" in decision_upper:
+            if not trade_decision:
+                return {
+                    "order_execution_result": {
+                        "success": False,
+                        "reason": "Failed to parse decision",
+                        "decision": final_decision,
+                    }
+                }
+            
+            # Handle HOLD action
+            if trade_decision.action == "HOLD":
                 return {
                     "order_execution_result": {
                         "success": True,
                         "action": "hold",
                         "message": "No action taken",
+                        "reason": trade_decision.reason,
                     }
                 }
             
-            # Extract action and quantity
-            side = None
-            quantity = None
+            # Map order type
+            order_type_map = {
+                "MARKET": OrderType.MARKET,
+                "LIMIT": OrderType.LIMIT,
+                "STOP": OrderType.STOP,
+                "STOP_LIMIT": OrderType.STOP_LIMIT,
+            }
+            order_type = order_type_map.get(trade_decision.order_type, OrderType.MARKET)
             
-            if "BUY" in decision_upper:
-                side = "buy"
-                # Try to extract quantity
-                import re
-                qty_match = re.search(r'(\d+(?:\.\d+)?)', decision_upper)
-                if qty_match:
-                    quantity = float(qty_match.group(1))
-                else:
-                    quantity = 1.0  # Default
-            elif "SELL" in decision_upper:
-                side = "sell"
-                qty_match = re.search(r'(\d+(?:\.\d+)?)', decision_upper)
-                if qty_match:
-                    quantity = float(qty_match.group(1))
-                else:
-                    quantity = 1.0  # Default
-            
-            if side and quantity:
-                # Execute order
+            # Execute order
+            if trade_decision.quantity:
                 result = self.execute_order(
                     state=state,
                     symbol=company_of_interest,
-                    side=side,
-                    quantity=quantity,
-                    order_type=OrderType.MARKET,  # Default to market order
+                    side=trade_decision.action.lower(),
+                    quantity=trade_decision.quantity,
+                    order_type=order_type,
+                    limit_price=trade_decision.limit_price,
+                    stop_price=trade_decision.stop_price,
                 )
                 
                 return {
@@ -209,7 +219,7 @@ class OrderExecutor:
                 return {
                     "order_execution_result": {
                         "success": False,
-                        "reason": "Could not parse decision",
+                        "reason": "No quantity specified in decision",
                         "decision": final_decision,
                     }
                 }
