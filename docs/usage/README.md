@@ -2,6 +2,10 @@
 
 ## 文档索引
 
+### 环境与入门
+
+0. [运行环境准备](./setup-environment.md) — 依赖安装、环境变量、数据库、Docker、验证步骤
+
 ### 核心功能
 
 1. [Long-Run Agent使用指南](./long-run-agent.md)
