@@ -178,6 +178,10 @@ class TradingAgentsGraph:
             config=self.config,
             prompt_manager=self.prompt_manager,
         )
+        
+        # Phase 3: Pass order executor to graph setup if trading is enabled
+        if self.config.get("trading_enabled", False) and self.order_executor:
+            self.graph_setup.order_executor = self.order_executor
 
         self.propagator = Propagator()
         self.reflector = Reflector(self.quick_thinking_llm)
@@ -192,6 +196,15 @@ class TradingAgentsGraph:
         self.db = None
         if self.config.get("database_enabled"):
             self._init_database()
+        
+        # --- Phase 3: Trading Interface ---
+        self.trading_interface = None
+        self.risk_controller = None
+        self.order_executor = None
+        self.order_manager = None
+        self.position_manager = None
+        if self.config.get("trading_enabled", False):
+            self._init_trading()
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
@@ -322,6 +335,52 @@ class TradingAgentsGraph:
         except Exception as exc:
             logger.warning("Checkpointer init failed: %s", exc)
             self.checkpointer = None
+    
+    def _init_trading(self):
+        """Initialize trading interface and related components."""
+        try:
+            from tradingagents.trading import AlpacaAdapter, OrderManager, PositionManager
+            from tradingagents.trading.risk_controller import RiskController
+            from tradingagents.trading.order_executor import OrderExecutor
+            
+            # Initialize trading interface
+            trading_config = {
+                "api_key": self.config.get("alpaca_api_key"),
+                "api_secret": self.config.get("alpaca_api_secret"),
+                "paper": self.config.get("alpaca_paper", True),
+                "base_url": self.config.get("alpaca_base_url"),
+            }
+            
+            self.trading_interface = AlpacaAdapter(trading_config)
+            if not self.trading_interface.connect():
+                logger.warning("Failed to connect to trading interface")
+                self.trading_interface = None
+                return
+            
+            # Initialize risk controller
+            risk_config = self.config.get("risk_config", {})
+            self.risk_controller = RiskController(risk_config)
+            
+            # Initialize order executor
+            self.order_executor = OrderExecutor(
+                trading_interface=self.trading_interface,
+                risk_controller=self.risk_controller,
+            )
+            
+            # Initialize managers
+            self.order_manager = OrderManager(self.trading_interface)
+            self.position_manager = PositionManager(self.trading_interface)
+            
+            logger.info("Trading interface initialized")
+        except ImportError as exc:
+            logger.warning(
+                "Trading init failed (missing packages?): %s. "
+                "For trading, install: pip install alpaca-py skfolio", exc
+            )
+            self.trading_interface = None
+        except Exception as exc:
+            logger.warning("Trading init failed: %s", exc)
+            self.trading_interface = None
 
     def _create_routed_llm(self, role_type: str, llm_kwargs: dict):
         """Create an LLM instance via model routing config."""
