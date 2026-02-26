@@ -213,19 +213,23 @@ state["company_of_interest"]  # 未使用的行
 
 ## 7. 优先级修复建议
 
-### 立即修复（P0）
-1. 修复RecoveryEngine的checkpoint API使用
-2. 修复OrderExecutor节点集成问题
-3. 重构剩余Analyst使用基类
+### ✅ 立即修复（P0）- 已完成
+1. ✅ 修复RecoveryEngine的checkpoint API使用
+2. ✅ 修复OrderExecutor节点集成问题
+3. ✅ 重构剩余Analyst使用基类
 
-### 近期修复（P1）
-1. 改进状态恢复逻辑
-2. 使用structured output解析交易决策
-3. 完善Alpaca适配器错误处理
-4. 实现Lineage统一集成
+### ✅ 近期修复（P1）- 已完成
+1. ✅ 改进状态恢复逻辑
+2. ✅ 使用structured output解析交易决策
+3. ✅ 完善Alpaca适配器错误处理（连接池管理）
+4. ✅ 实现Lineage统一集成
 
-### 后续优化（P2）
-1. 实现错误恢复机制
-2. 优化数据流和缓存
-3. 添加测试覆盖
-4. 完善文档
+### ✅ 后续优化（P2）- 已完成（P1部分）
+1. ✅ 实现错误恢复机制
+2. ✅ 优化数据流和缓存（DataAccessor）
+3. ⏳ 添加测试覆盖（待实现）
+4. ⏳ 完善文档（部分完成）
+
+### 可选功能（P2）
+1. ⏳ 插件机制（可选）
+2. ⏳ 配置驱动流程（可选）
