@@ -4,6 +4,65 @@
 
 ### 1.0 架构冗余与独立模块分析
 
+#### 1.0.0 专家模块（Buffett, Munger, Lynch等）使用情况分析
+
+| 模块 | 状态 | 在流程中的位置 | 作用 | 默认配置 |
+|:----|:----|:-------------|:-----|:--------|
+| **Experts Framework** | ✅ 已实现并启用 | Bull/Bear辩论后 → Experts → Research Manager | 提供投资专家视角评估 | `experts_enabled=True` |
+
+**详细分析**：
+
+1. **专家模块架构**：
+   - 已实现5位投资专家：Buffett（价值投资）、Munger（长期持有）、Lynch（成长投资）、Graham（深度价值）、Livermore（趋势交易）
+   - 完整的注册机制：`ExpertRegistry`自动注册专家
+   - 智能选择机制：`ExpertSelector`根据股票特征自动选择专家
+   - 专家评估输出：结构化的`ExpertOutput`（推荐、置信度、时间周期、关键理由、风险、仓位建议）
+
+2. **在LangGraph流程中的位置**：
+   ```
+   Bull Researcher ⇄ Bear Researcher (辩论)
+     ↓ (可选路由)
+   Experts (专家评估) ← 如果experts_enabled=True
+     ↓
+   Research Manager (综合专家意见)
+     ↓
+   Trader
+   ```
+
+3. **专家选择逻辑**：
+   - **自动模式**（默认）：根据股票特征（行业、市值、波动率、投资风格）自动选择
+   - **手动模式**：用户指定专家列表
+   - **随机模式**：用于A/B测试
+   - 选择规则示例：
+     - 消费行业+大盘股 → Buffett, Munger, Lynch
+     - 科技行业+小盘股 → Lynch, Graham, Livermore
+     - 高波动股票 → Livermore, Lynch, Graham
+
+4. **专家评估的作用**：
+   - 提供不同投资哲学视角的评估（价值vs成长vs趋势）
+   - 为Research Manager提供额外的决策依据
+   - 专家评估结果存储在`expert_evaluations`中，包含：
+     - 推荐（BUY/SELL/HOLD）
+     - 置信度（0-1）
+     - 时间周期（短期/中期/长期）
+     - 关键理由（3-5条）
+     - 风险因素
+     - 仓位建议（0-100%）
+
+5. **当前使用情况**：
+   - ✅ 代码完整实现
+   - ✅ 已集成到LangGraph流程
+   - ✅ 默认启用（`experts_enabled=True`）
+   - ⚠️ 但需要`experts_enabled=True`配置才会在流程中激活
+   - ⚠️ 专家评估结果可能未被充分利用（需要检查Research Manager是否使用）
+
+**建议**：
+- 检查Research Manager是否充分利用专家评估结果
+- 考虑在Trader节点中也使用专家评估
+- 可以添加专家评估的可视化展示
+
+### 1.0 架构冗余与独立模块分析
+
 #### 1.0.1 冗余代码和模块
 
 | 模块/功能 | 冗余类型 | 状态 | 建议 |
@@ -1007,37 +1066,142 @@ TRADING_CONFIG = {
 | 实现错误恢复 | P1 | 3天 |
 | 性能优化 | P2 | 3天 |
 
-## 6. 技术选型建议
+## 6. 技术选型建议与开源工具推荐
 
 ### 6.1 调度框架
 
-| 方案 | 优点 | 缺点 | 推荐度 |
-|:----|:----|:----|:------|
-| **APScheduler** | 轻量、易用、支持多种触发器 | 单机部署，无分布式支持 | ⭐⭐⭐⭐ |
-| **Celery** | 分布式、高可用、任务队列 | 需要Redis/RabbitMQ，复杂度高 | ⭐⭐⭐ |
-| **Airflow** | 功能强大、可视化 | 重量级，适合复杂工作流 | ⭐⭐ |
+| 方案 | 优点 | 缺点 | 推荐度 | 开源状态 |
+|:----|:----|:----|:------|:--------|
+| **APScheduler** | 轻量、易用、支持多种触发器、无外部依赖 | 单机部署，无分布式支持 | ⭐⭐⭐⭐ | ✅ 开源 (BSD) |
+| **Celery** | 分布式、高可用、任务队列、成熟稳定 | 需要Redis/RabbitMQ，复杂度高 | ⭐⭐⭐ | ✅ 开源 (BSD) |
+| **Airflow** | 功能强大、可视化、工作流管理 | 重量级，适合复杂工作流 | ⭐⭐ | ✅ 开源 (Apache 2.0) |
 
-**推荐**：APScheduler（单机）或Celery（分布式）
+**推荐**：
+- **单机部署**：使用 **APScheduler**（`pip install apscheduler`），轻量级，无需额外组件
+- **分布式部署**：使用 **Celery**（`pip install celery[redis]`），需要Redis作为消息代理
+
+**实施建议**：
+```python
+# 使用APScheduler（推荐用于单机）
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+
+scheduler = BackgroundScheduler(
+    jobstores={'default': SQLAlchemyJobStore(url='sqlite:///jobs.sqlite')}
+)
+```
 
 ### 6.2 交易接口
 
-| 方案 | 优点 | 缺点 | 推荐度 |
-|:----|:----|:----|:------|
-| **Alpaca** | API简单、文档完善、支持纸面交易 | 仅支持美股 | ⭐⭐⭐⭐⭐ |
-| **Interactive Brokers** | 支持全球市场、功能强大 | API复杂、需要TWS/Gateway | ⭐⭐⭐ |
-| **TradingView** | 可视化好 | API限制多 | ⭐⭐ |
+| 方案 | 优点 | 缺点 | 推荐度 | 开源状态 |
+|:----|:----|:----|:------|:--------|
+| **Alpaca** | API简单、文档完善、支持纸面交易、Python SDK完善 | 仅支持美股 | ⭐⭐⭐⭐⭐ | ✅ SDK开源 (Apache 2.0) |
+| **Interactive Brokers** | 支持全球市场、功能强大 | API复杂、需要TWS/Gateway | ⭐⭐⭐ | ✅ ib_async开源 (MIT) |
+| **TradingView** | 可视化好 | API限制多 | ⭐⭐ | ❌ 商业API |
 
-**推荐**：Alpaca（优先，简单易用）或IB（需要全球市场时）
+**推荐**：
+- **优先使用Alpaca**：`pip install alpaca-trade-api`，简单易用，支持纸面交易
+- **全球市场**：使用Interactive Brokers + `ib_async`（`pip install ib_async`）
 
-### 6.3 监控方案
+**实施建议**：
+```python
+# 使用Alpaca（推荐）
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import MarketOrderRequest
 
-| 方案 | 优点 | 缺点 | 推荐度 |
-|:----|:----|:----|:------|
-| **Prometheus + Grafana** | 功能强大、可视化好 | 需要额外部署 | ⭐⭐⭐⭐ |
-| **Langfuse** | 已集成、LLM专用 | 功能有限 | ⭐⭐⭐ |
-| **自定义日志** | 简单、灵活 | 功能有限 | ⭐⭐ |
+client = TradingClient(api_key, secret_key, paper=True)  # 纸面交易
+```
 
-**推荐**：Prometheus + Grafana（生产环境）
+### 6.3 风险控制与投资组合优化
+
+| 方案 | 功能 | 推荐度 | 开源状态 | 适用场景 |
+|:----|:----|:------|:--------|:--------|
+| **skfolio** | 投资组合优化、风险度量、CVaR、EVaR | ⭐⭐⭐⭐⭐ | ✅ 开源 (BSD 3-Clause) | 现代投资组合理论 |
+| **PyPortfolioOpt** | 均值方差优化、Black-Litterman、HRP | ⭐⭐⭐⭐ | ✅ 开源 (MIT) | 经典投资组合优化 |
+| **pyfolio** | 投资组合和风险分析、回测分析 | ⭐⭐⭐⭐ | ✅ 开源 (Apache 2.0) | 风险分析和回测 |
+| **Cvxportfolio** | 投资组合优化、回测、市场模拟 | ⭐⭐⭐ | ✅ 开源 (Apache 2.0) | 高级优化策略 |
+
+**推荐**：
+- **风险控制**：使用 **skfolio**（`pip install skfolio`），功能最全面，与scikit-learn兼容
+- **投资组合优化**：使用 **PyPortfolioOpt**（`pip install PyPortfolioOpt`），简单易用
+- **风险分析**：使用 **pyfolio**（`pip install pyfolio`），Quantopian出品，分析功能强大
+
+**实施建议**：
+```python
+# 使用skfolio进行风险控制（推荐）
+from skfolio import Portfolio, RiskMeasure
+from skfolio.optimization import MeanRisk
+
+portfolio = Portfolio(returns=returns)
+optimizer = MeanRisk(risk_measure=RiskMeasure.CVAR)
+portfolio.optimize(optimizer)
+```
+
+### 6.4 订单管理系统（OMS）
+
+| 方案 | 功能 | 推荐度 | 开源状态 | 适用场景 |
+|:----|:----|:------|:--------|:--------|
+| **EOMS** | 模块化OMS、GUI、订单管理、持仓管理 | ⭐⭐⭐⭐ | ✅ 开源 (PyPI) | 系统化交易 |
+| **omspy** | 订单管理系统、股票交易 | ⭐⭐⭐ | ✅ 开源 (MIT) | 股票交易OMS |
+| **Hummingbot** | 加密货币做市、策略框架 | ⭐⭐⭐ | ✅ 开源 (Apache 2.0) | 加密货币交易 |
+
+**推荐**：
+- **股票交易OMS**：使用 **EOMS**（`pip install eoms`），功能完整，模块化设计
+- **简单OMS**：使用 **omspy**（GitHub），轻量级
+
+**实施建议**：
+```python
+# 使用EOMS（推荐用于系统化交易）
+# EOMS提供完整的订单管理、持仓管理、算法管理功能
+# 支持插件架构，可扩展
+```
+
+### 6.5 监控方案
+
+| 方案 | 优点 | 缺点 | 推荐度 | 开源状态 |
+|:----|:----|:----|:------|:--------|
+| **Prometheus + Grafana** | 功能强大、可视化好、指标丰富 | 需要额外部署 | ⭐⭐⭐⭐ | ✅ 开源 (Apache 2.0) |
+| **Langfuse** | 已集成、LLM专用、追踪LLM调用 | 功能有限 | ⭐⭐⭐ | ✅ 开源 (MIT) |
+| **自定义日志** | 简单、灵活 | 功能有限 | ⭐⭐ | - |
+
+**推荐**：
+- **生产环境**：使用 **Prometheus + Grafana**（`pip install prometheus-client`）
+- **LLM追踪**：继续使用 **Langfuse**（已集成）
+
+**实施建议**：
+```python
+# 使用Prometheus（推荐）
+from prometheus_client import Counter, Histogram, start_http_server
+
+order_counter = Counter('orders_total', 'Total orders')
+order_latency = Histogram('order_latency_seconds', 'Order latency')
+start_http_server(8000)  # 暴露指标端点
+```
+
+### 6.6 其他开源工具推荐
+
+| 工具 | 用途 | 推荐度 | 开源状态 |
+|:----|:----|:------|:--------|
+| **pandas-ta** | 技术指标计算 | ⭐⭐⭐⭐⭐ | ✅ 开源 (MIT) - 已使用 |
+| **yfinance** | 股票数据获取 | ⭐⭐⭐⭐⭐ | ✅ 开源 (Apache 2.0) - 已使用 |
+| **backtrader** | 回测框架 | ⭐⭐⭐⭐ | ✅ 开源 (GPL 3.0) |
+| **zipline** | 算法交易回测 | ⭐⭐⭐ | ✅ 开源 (Apache 2.0) |
+| **ta-lib** | 技术分析库 | ⭐⭐⭐⭐ | ✅ 开源 (BSD) |
+
+**实施建议**：
+- **回测**：考虑使用 **backtrader**（`pip install backtrader`）替代或补充现有回测功能
+- **技术指标**：继续使用 **pandas-ta**（已使用）或考虑 **ta-lib**（C库，性能更好）
+
+### 6.7 开源工具集成优先级
+
+| 优先级 | 工具 | 用途 | 实施难度 | 收益 |
+|:------|:----|:-----|:--------|:-----|
+| **P0** | APScheduler | 定时任务调度 | 低 | 高 |
+| **P0** | Alpaca SDK | 交易执行 | 低 | 高 |
+| **P1** | skfolio | 风险控制 | 中 | 高 |
+| **P1** | Prometheus | 监控 | 中 | 中 |
+| **P2** | EOMS | 订单管理 | 高 | 中 |
+| **P2** | backtrader | 回测增强 | 中 | 中 |
 
 ## 7. 架构冗余与独立模块处理建议
 
@@ -1134,6 +1298,17 @@ def get_stock_data(...):
    - `lineage`模块部分使用，需要统一集成到所有数据源
    - 工具函数分散，需要合并和重命名
 6. **独立模块**：`dashboard`、`backtest`、`scripts`作为独立工具保留，符合设计
+7. **专家模块（Buffett, Munger, Lynch等）**：
+   - ✅ 已完整实现并集成到LangGraph流程
+   - ✅ 默认启用（`experts_enabled=True`）
+   - ✅ 智能选择机制根据股票特征自动选择专家
+   - ⚠️ 需要确认Research Manager是否充分利用专家评估结果
+8. **开源工具可用性**：
+   - ✅ 调度：APScheduler（单机）或Celery（分布式）
+   - ✅ 风险控制：skfolio、PyPortfolioOpt、pyfolio
+   - ✅ 订单管理：EOMS、omspy
+   - ✅ 监控：Prometheus + Grafana
+   - ✅ 交易接口：Alpaca SDK、ib_async
 
 ### 7.2 优先级建议
 
