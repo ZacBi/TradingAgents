@@ -3,24 +3,8 @@
 from typing import Any
 
 from langchain_openai import ChatOpenAI
-from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
-from langgraph.types import Send
 
-from tradingagents.agents import (
-    create_aggressive_debator,
-    create_bear_researcher,
-    create_bull_researcher,
-    create_conservative_debator,
-    create_fundamentals_analyst,
-    create_market_analyst,
-    create_neutral_debator,
-    create_news_analyst,
-    create_research_manager,
-    create_risk_manager,
-    create_social_media_analyst,
-    create_trader,
-)
 from tradingagents.agents.utils.agent_states import AgentState
 from tradingagents.experts import create_expert_team_node
 from tradingagents.research import create_deep_research_agent
@@ -105,98 +89,6 @@ class GraphSetup:
             )
         return valuation_node, deep_research_node, expert_team_node
 
-    def _add_core_nodes(
-        self,
-        workflow: StateGraph,
-        valuation_node,
-        deep_research_node,
-        expert_team_node,
-        bull_researcher_node,
-        bear_researcher_node,
-        research_manager_node,
-        trader_node,
-        aggressive_analyst,
-        neutral_analyst,
-        conservative_analyst,
-        risk_manager_node,
-    ) -> None:
-        """Register all non-analyst nodes on the workflow."""
-        if valuation_node is not None:
-            workflow.add_node("Valuation Analyst", valuation_node)
-        if deep_research_node is not None:
-            workflow.add_node("Deep Research", deep_research_node)
-        workflow.add_node("Bull Researcher", bull_researcher_node)
-        workflow.add_node("Bear Researcher", bear_researcher_node)
-        if expert_team_node is not None:
-            workflow.add_node("Experts", expert_team_node)
-        workflow.add_node("Research Manager", research_manager_node)
-        workflow.add_node("Trader", trader_node)
-        workflow.add_node("Aggressive Analyst", aggressive_analyst)
-        workflow.add_node("Neutral Analyst", neutral_analyst)
-        workflow.add_node("Conservative Analyst", conservative_analyst)
-        workflow.add_node("Risk Judge", risk_manager_node)
-
-    def _connect_analysts_to_next(
-        self, workflow: StateGraph, selected_analysts: list, next_after_analysts: str
-    ) -> None:
-        """Add START→analysts and analysts→next_after_analysts edges."""
-        _selected = list(selected_analysts)
-        workflow.add_conditional_edges(
-            START,
-            lambda state: [Send(f"Analyst_{t}", state) for t in _selected],
-            [f"Analyst_{t}" for t in selected_analysts],
-        )
-        for analyst_type in selected_analysts:
-            workflow.add_edge(f"Analyst_{analyst_type}", next_after_analysts)
-
-    def _connect_valuation_and_deep(
-        self, workflow: StateGraph, valuation_enabled: bool, use_deep_branch: bool
-    ) -> None:
-        """Add edges from Valuation/After Analysts to Deep Research or Bull Researcher."""
-        if valuation_enabled and use_deep_branch:
-            workflow.add_conditional_edges(
-                "Valuation Analyst",
-                self.conditional_logic.should_run_deep_research,
-                {"Deep Research": "Deep Research", "Bull Researcher": "Bull Researcher"},
-            )
-            workflow.add_edge("Deep Research", "Bull Researcher")
-        elif valuation_enabled:
-            workflow.add_edge("Valuation Analyst", "Bull Researcher")
-        elif use_deep_branch:
-            workflow.add_conditional_edges(
-                "After Analysts",
-                self.conditional_logic.should_run_deep_research,
-                {"Deep Research": "Deep Research", "Bull Researcher": "Bull Researcher"},
-            )
-            workflow.add_edge("Deep Research", "Bull Researcher")
-
-    def _connect_debate_and_risk(self, workflow: StateGraph, expert_team_node) -> None:
-        """Add debate (Bull/Bear/Experts) and risk chain edges."""
-        bull_targets = {"Bear Researcher": "Bear Researcher", "Research Manager": "Research Manager"}
-        if expert_team_node is not None:
-            bull_targets["Experts"] = "Experts"
-        workflow.add_conditional_edges(
-            "Bull Researcher", self.conditional_logic.should_continue_debate, bull_targets
-        )
-        bear_targets = {"Bull Researcher": "Bull Researcher", "Research Manager": "Research Manager"}
-        if expert_team_node is not None:
-            bear_targets["Experts"] = "Experts"
-        workflow.add_conditional_edges(
-            "Bear Researcher", self.conditional_logic.should_continue_debate, bear_targets
-        )
-        if expert_team_node is not None:
-            workflow.add_edge("Experts", "Research Manager")
-        workflow.add_edge("Research Manager", "Trader")
-        workflow.add_edge("Trader", "Aggressive Analyst")
-        for from_node, to_options in [
-            ("Aggressive Analyst", {"Conservative Analyst": "Conservative Analyst", "Risk Judge": "Risk Judge"}),
-            ("Conservative Analyst", {"Neutral Analyst": "Neutral Analyst", "Risk Judge": "Risk Judge"}),
-            ("Neutral Analyst", {"Aggressive Analyst": "Aggressive Analyst", "Risk Judge": "Risk Judge"}),
-        ]:
-            workflow.add_conditional_edges(
-                from_node, self.conditional_logic.should_continue_risk_analysis, to_options
-            )
-        workflow.add_edge("Risk Judge", END)
 
     def setup_graph(self, selected_analysts=None):
         """Set up and compile the agent workflow graph.
