@@ -145,7 +145,7 @@ graph TB
 |:--------|:--------|:--------|:-----|
 | **Web框架** | FastAPI | Flask/Django | 性能好，自动文档，类型提示 |
 | **异步框架** | Uvicorn | Gunicorn | ASGI标准，支持异步 |
-| **认证** | FastAPI-Users | Authlib | 功能完整，易集成 |
+| **简单认证** | 自定义中间件 | - | 单用户场景，简单API Key验证（可选） |
 | **数据库ORM** | SQLAlchemy 2.0 | Tortoise ORM | 成熟稳定，功能强大 |
 | **缓存** | Redis | Memcached | 功能丰富，支持多种数据结构 |
 | **任务队列** | Celery + Redis | RQ | 功能强大，支持分布式 |
