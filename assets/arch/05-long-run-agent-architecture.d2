@@ -1,0 +1,79 @@
+direction: down
+
+title: Long-Run Agent 升级架构 {
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+Scheduler: 调度层 {
+  style.fill: "#e3f2fd"
+  Cron: APScheduler / Cron {
+    shape: text
+  }
+  Event: 事件触发器 {
+    shape: text
+  }
+  Cron -> Event: 或
+}
+
+Orchestrator: 编排层 {
+  style.fill: "#e8f5e9"
+  Batch: Batch Propagator {
+    shape: text
+  }
+  Reflect: Reflection Loop {
+    shape: text
+  }
+  Batch -> Reflect: 收益反馈
+}
+
+Graph: TradingAgents Graph {
+  style.fill: "#fff8e1"
+  Propagate: propagate(ticker, date) {
+    shape: text
+  }
+  Checkpoint: LangGraph Checkpointer {
+    shape: cylinder
+  }
+  Propagate -> Checkpoint: 持久化
+}
+
+State: 状态外部化 {
+  style.fill: "#f3e5f5"
+  DB: SQLite / Postgres {
+    shape: cylinder
+  }
+  Store: LangGraph Store {
+    shape: cylinder
+  }
+}
+
+Control: 控制循环 {
+  style.fill: "#fff3e0"
+  Monitor: 行为监控 {
+    shape: text
+  }
+  Budget: 稳定性预算 {
+    shape: text
+  }
+  Monitor -> Budget: 漂移检测
+}
+
+Scheduler -> Orchestrator: 触发
+Orchestrator -> Graph: 调用
+Graph -> State: 读写
+Control -> Orchestrator: 约束
+
+DataFlow: |md
+  **数据流**:
+  1. Cron/Event → Batch 触发
+  2. Batch → propagate() 执行
+  3. Checkpoint/Store 持久化状态
+  4. Reflect 从 DB 拉取 returns_losses → 更新 Store
+  5. Monitor 检测决策分布/胜率 → Budget 约束
+| {
+  shape: text
+  style.font-size: 12
+}

@@ -1,0 +1,61 @@
+direction: right
+
+title: 自主交易 Agent 架构 {
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+Decision: 决策层 {
+  style.fill: "#e8f5e9"
+  direction: down
+  Graph: TradingAgents Graph
+  Signal: SignalProcessor
+  Sizer: Position Sizer
+  Graph -> Signal -> Sizer
+}
+
+Approval: 审批层 {
+  style.fill: "#fff8e1"
+  HITL: Human-in-the-Loop? {
+    shape: diamond
+  }
+  Auto: 自动通过
+  Manual: 人工确认
+  HITL -> Auto: 低风险/自动模式
+  HITL -> Manual: 高风险/需审批
+}
+
+Execution: 执行层 {
+  style.fill: "#e3f2fd"
+  Broker: Broker Interface {
+    shape: hexagon
+  }
+  Paper: Paper Broker
+  Live: Live Broker
+  Broker -> Paper: 模拟
+  Broker -> Live: 实盘
+}
+
+Persistence: 持久化 {
+  style.fill: "#f3e5f5"
+  Trades: trades 表
+  Positions: positions 表
+  Nav: daily_nav 表
+}
+
+Decision -> Approval: (action, quantity, confidence)
+Approval -> Execution: 通过
+Execution -> Persistence: record_trade, upsert_position
+
+Payload: |md
+  **关键 Payload**:
+  - Signal: BUY|SELL|HOLD
+  - Sizer: quantity_ratio (0-1)
+  - interrupt(): { ticker, action, quantity, reason }
+  - resume(): { approved: bool, modified_quantity?: number }
+| {
+  shape: text
+  style.font-size: 11
+}
