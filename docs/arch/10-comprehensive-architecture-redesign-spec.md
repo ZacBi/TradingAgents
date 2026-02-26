@@ -292,6 +292,22 @@ graph TB
 
 ## 4. 代码清理与重构Spec
 
+### 4.0 专家模块（Experts）使用情况
+
+| 模块 | 状态 | 在流程中的位置 | 作用 | 优化建议 |
+|:----|:----|:-------------|:-----|:--------|
+| **Experts Framework** | ✅ 已实现并启用 | Bull/Bear辩论后 → Experts → Research Manager | 提供投资专家视角评估 | 检查Research Manager是否充分利用专家评估结果 |
+
+**专家模块设计要点**：
+- 已实现5位投资专家：Buffett、Munger、Lynch、Graham、Livermore
+- 智能选择机制：根据股票特征自动选择专家
+- 专家评估输出：结构化输出（推荐、置信度、时间周期、关键理由、风险、仓位建议）
+
+**优化建议**：
+- 确认Research Manager是否充分利用专家评估结果
+- 考虑在Trader节点中也使用专家评估
+- 可以添加专家评估的可视化展示
+
 ### 4.1 立即删除的模块
 
 | 模块/文件 | 删除原因 | 影响文件数 | 优先级 | 风险 |
@@ -327,6 +343,17 @@ graph TB
 | Bull/Bear Researcher（90%重复） | BaseResearcher | prompt_name、prefix |
 | 三个Risk Debator（85%重复） | BaseDebator | prompt_name、prefix、style |
 | 四个Analyst（70%重复） | BaseAnalyst | prompt_name、tools |
+
+### 4.2 Lineage数据溯源完善
+
+| 问题 | 当前状态 | 优化方案 | 优先级 |
+|:----|:--------|:--------|:------|
+| **Lineage部分使用** | 仅在yfinance中使用 | 统一集成到所有数据源 | P1 |
+
+**设计要点**：
+- 在所有数据源中统一调用lineage函数
+- 确保决策与原始数据的完整关联
+- 支持决策溯源和审计
 
 ### 4.3 状态管理重构
 
@@ -371,9 +398,24 @@ graph TB
 | **QuantLib** | 作为OptionPricer | 期权定价和希腊字母计算 |
 | **Prometheus** | 作为MetricsCollector | 指标收集和暴露 |
 
-## 6. 实施路线图
+## 6. 关键Bug修复
 
-### 6.1 Phase 1: 代码清理与基础重构（2-3周）
+### 6.1 已发现的Bug
+
+| Bug | 位置 | 描述 | 优先级 | 修复方案 |
+|:----|:-----|:----|:------|:--------|
+| **读取错误字段** | `risk_manager.py:16` | `fundamentals_report = state["news_report"]`应该是`state["fundamentals_report"]` | P0 | 修正字段名 |
+
+### 6.2 潜在问题
+
+| 问题 | 位置 | 描述 | 优先级 | 缓解方案 |
+|:----|:-----|:----|:------|:--------|
+| **循环依赖风险** | `setup.py:188-195` | 三个Risk Debator形成循环，仅靠count限制 | P0 | 引入状态机、超时机制、循环检测 |
+| **状态竞争** | `bull_researcher.py`、`bear_researcher.py` | 同时更新同一状态 | P0 | 不可变状态或状态锁 |
+
+## 7. 实施路线图
+
+### 7.1 Phase 1: 代码清理与基础重构（2-3周）
 
 | 任务 | 优先级 | 预计时间 | 风险 |
 |:----|:------|:--------|:-----|
@@ -385,7 +427,7 @@ graph TB
 | 拆分GraphSetup | P1 | 3天 | 中 |
 | 简化条件逻辑 | P1 | 2天 | 中 |
 
-### 6.2 Phase 2: Long-Run Agent实现（2-3周）
+### 7.2 Phase 2: Long-Run Agent实现（2-3周）
 
 | 任务 | 优先级 | 预计时间 | 风险 |
 |:----|:------|:--------|:-----|
@@ -395,7 +437,7 @@ graph TB
 | 实现健康检查 | P1 | 2天 | 低 |
 | 集成Prometheus监控 | P1 | 2天 | 低 |
 
-### 6.3 Phase 3: 交易执行实现（3-4周）
+### 7.3 Phase 3: 交易执行实现（3-4周）
 
 | 任务 | 优先级 | 预计时间 | 风险 |
 |:----|:------|:--------|:-----|
@@ -407,7 +449,7 @@ graph TB
 | 实现OrderManager | P1 | 2天 | 低 |
 | 实现PositionManager | P1 | 2天 | 低 |
 
-### 6.4 Phase 4: 增强功能（2-3周）
+### 7.4 Phase 4: 增强功能（2-3周）
 
 | 任务 | 优先级 | 预计时间 | 风险 |
 |:----|:------|:--------|:-----|
@@ -417,7 +459,7 @@ graph TB
 | 引入插件机制 | P2 | 4天 | 中 |
 | 配置驱动流程 | P2 | 3天 | 中 |
 
-## 7. 架构设计原则
+## 8. 架构设计原则
 
 ### 7.1 设计模式应用
 
@@ -441,7 +483,7 @@ graph TB
 | **接口隔离** | 使用多个专门接口 | 细粒度接口设计 |
 | **最小知识** | 减少模块间依赖 | 状态访问抽象、配置注入 |
 
-## 8. 配置设计Spec
+## 9. 配置设计Spec
 
 ### 8.1 配置结构设计
 
@@ -466,7 +508,7 @@ graph TB
 | `workflow.conditions` | 条件规则定义 | 规则引擎配置 |
 | `workflow.routing` | 路由规则定义 | 策略配置 |
 
-## 9. 数据模型设计Spec
+## 10. 数据模型设计Spec
 
 ### 9.1 状态模型优化
 
@@ -489,7 +531,7 @@ graph TB
 | `expiration` | date | 到期日（期权） | `2026-03-15` |
 | `strike` | float | 行权价（期权） | `150.0` |
 
-## 10. 接口设计Spec
+## 11. 接口设计Spec
 
 ### 10.1 Agent接口设计
 
@@ -516,7 +558,7 @@ graph TB
 | `get_position()` | 获取持仓 | 全部 | 统一持仓模型 |
 | `cancel_order()` | 撤单 | 全部 | 订单状态管理 |
 
-## 11. 关键设计决策
+## 12. 关键设计决策
 
 ### 11.1 架构决策
 
@@ -538,9 +580,9 @@ graph TB
 | **监控** | Prometheus + Grafana | 生产环境标准 |
 | **Checkpoint** | PostgreSQL | 支持长期运行，高可用 |
 
-## 12. 实施检查清单
+## 13. 实施检查清单
 
-### 12.1 Phase 1检查清单
+### 13.1 Phase 1检查清单
 
 - [ ] 删除`agents/specialists/`目录
 - [ ] 删除`dataflows/utils.py`
@@ -552,7 +594,7 @@ graph TB
 - [ ] 拆分GraphSetup（NodeFactory、GraphBuilder、EdgeConnector）
 - [ ] 简化条件逻辑（ConditionEvaluator、RouteResolver）
 
-### 12.2 Phase 2检查清单
+### 13.2 Phase 2检查清单
 
 - [ ] Checkpoint升级为PostgreSQL
 - [ ] 实现状态恢复机制（RecoveryEngine）
@@ -560,7 +602,7 @@ graph TB
 - [ ] 实现健康检查（HealthMonitor）
 - [ ] 集成Prometheus监控
 
-### 12.3 Phase 3检查清单
+### 13.3 Phase 3检查清单
 
 - [ ] 设计TradingInterface抽象层
 - [ ] 实现Alpaca适配器
@@ -570,7 +612,7 @@ graph TB
 - [ ] 实现OrderManager
 - [ ] 实现PositionManager
 
-### 12.4 Phase 4检查清单
+### 13.4 Phase 4检查清单
 
 - [ ] 统一Lineage集成（所有数据源）
 - [ ] 实现错误恢复机制
@@ -578,7 +620,7 @@ graph TB
 - [ ] 引入插件机制（可选）
 - [ ] 配置驱动流程（可选）
 
-## 13. 风险与缓解
+## 14. 风险与缓解
 
 ### 13.1 技术风险
 
@@ -597,7 +639,7 @@ graph TB
 | 测试不充分 | 高 | 每个阶段充分测试 |
 | 文档不完善 | 低 | 重构前完善文档 |
 
-## 14. 成功标准
+## 15. 成功标准
 
 ### 14.1 架构质量指标
 
@@ -617,7 +659,7 @@ graph TB
 | **风险控制** | 实时风控，支持所有交易类型 |
 | **监控告警** | 完善的监控和告警机制 |
 
-## 15. 总结
+## 16. 总结
 
 ### 15.1 核心改进方向
 
