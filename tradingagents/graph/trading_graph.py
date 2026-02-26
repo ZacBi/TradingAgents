@@ -48,6 +48,7 @@ from tradingagents.llm_clients import create_llm_client
 
 from .conditional_logic import ConditionalLogic
 from .propagation import Propagator
+from .recovery import RecoveryEngine
 from .reflection import Reflector
 from .setup import GraphSetup
 from .signal_processing import SignalProcessor
@@ -151,8 +152,11 @@ class TradingAgentsGraph:
 
         # --- Phase 0: LangGraph Checkpointing (before GraphSetup) ---
         self.checkpointer = None
+        self.recovery_engine = None
         if self.config.get("checkpointing_enabled"):
             self._init_checkpointer()
+            if self.checkpointer:
+                self.recovery_engine = RecoveryEngine(self.checkpointer)
 
         # Initialize components
         self.conditional_logic = ConditionalLogic(
@@ -429,6 +433,15 @@ class TradingAgentsGraph:
         thread_id = None
         if self.checkpointer is not None:
             thread_id = f"{company_name}-{trade_date}"
+            
+            # Phase 2: Try to recover state if available
+            if self.recovery_engine and self.recovery_engine.can_recover(thread_id):
+                logger.info("Recovering state from checkpoint for thread_id: %s", thread_id)
+                recovered_state = self.recovery_engine.recover_state(thread_id)
+                if recovered_state:
+                    # Merge recovered state with initial state
+                    init_agent_state.update(recovered_state)
+                    logger.info("State recovered successfully")
 
         args = self.propagator.get_graph_args(thread_id=thread_id)
 
