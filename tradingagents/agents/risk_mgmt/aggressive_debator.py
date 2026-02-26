@@ -1,54 +1,52 @@
+from tradingagents.agents.base import BaseDebator
+from tradingagents.graph.state_manager import StateManager
+from tradingagents.prompts import PromptNames
 
-from tradingagents.prompts import PromptNames, get_prompt_manager
+
+class AggressiveDebator(BaseDebator):
+    """Aggressive Debator agent using BaseDebator."""
+    
+    def __init__(self, llm):
+        """Initialize Aggressive Debator.
+        
+        Args:
+            llm: Language model instance
+        """
+        super().__init__(
+            llm=llm,
+            prompt_name=PromptNames.RISK_AGGRESSIVE,
+            prefix="Aggressive Analyst",
+            name="Aggressive Debator",
+        )
+        self.state_manager = StateManager()
+    
+    def analyze(self, state):
+        """Execute aggressive debator analysis.
+        
+        Args:
+            state: Current agent state
+            
+        Returns:
+            Dictionary with argument
+        """
+        # Use base class analyze to get argument
+        result = super().analyze(state)
+        argument = result["argument"]
+        agent_type = result["agent_type"]
+        
+        # Use StateManager to update state
+        state_update = self.state_manager.update_risk_debate_state(state, agent_type, argument)
+        return state_update
 
 
 def create_aggressive_debator(llm):
-    pm = get_prompt_manager()
-
-    def aggressive_node(state) -> dict:
-        risk_debate_state = state["risk_debate_state"]
-        history = risk_debate_state.get("history", "")
-        aggressive_history = risk_debate_state.get("aggressive_history", "")
-
-        current_conservative_response = risk_debate_state.get("current_conservative_response", "")
-        current_neutral_response = risk_debate_state.get("current_neutral_response", "")
-
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
-
-        trader_decision = state["trader_investment_plan"]
-
-        prompt = pm.get_prompt(PromptNames.RISK_AGGRESSIVE, variables={
-            "trader_decision": trader_decision,
-            "market_research_report": market_research_report,
-            "sentiment_report": sentiment_report,
-            "news_report": news_report,
-            "fundamentals_report": fundamentals_report,
-            "history": history,
-            "current_conservative_response": current_conservative_response,
-            "current_neutral_response": current_neutral_response,
-        })
-
-        response = llm.invoke(prompt)
-
-        argument = f"Aggressive Analyst: {response.content}"
-
-        new_risk_debate_state = {
-            "history": history + "\n" + argument,
-            "aggressive_history": aggressive_history + "\n" + argument,
-            "conservative_history": risk_debate_state.get("conservative_history", ""),
-            "neutral_history": risk_debate_state.get("neutral_history", ""),
-            "latest_speaker": "Aggressive",
-            "current_aggressive_response": argument,
-            "current_conservative_response": risk_debate_state.get("current_conservative_response", ""),
-            "current_neutral_response": risk_debate_state.get(
-                "current_neutral_response", ""
-            ),
-            "count": risk_debate_state["count"] + 1,
-        }
-
-        return {"risk_debate_state": new_risk_debate_state}
-
-    return aggressive_node
+    """Factory function to create Aggressive Debator.
+    
+    Args:
+        llm: Language model instance
+        
+    Returns:
+        Aggressive debator node function
+    """
+    debator = AggressiveDebator(llm)
+    return debator.execute
