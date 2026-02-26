@@ -1,0 +1,69 @@
+direction: down
+
+title: 当前 TradingAgents 架构 {
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+DataLayer: 数据层 (route_to_vendor路由, 支持fallback) {
+  style.fill: "#fff3e0"
+  YF: YFinance (默认)
+  AV: Alpha Vantage (备用)
+}
+
+AnalystLayer: 分析师层 (串行，固定4个，相同LLM) {
+  style.fill: "#fff8e1"
+  direction: right
+  MA: Market Analyst -> SA: Social Analyst -> NA: News Analyst -> FA: Fundamentals
+}
+
+ResearchLayer: 研究层 (固定轮次辩论 max_rounds=1) {
+  style.fill: "#e8f5e9"
+  Bull: Bull Researcher
+  Bear: Bear Researcher
+  RM: Research Manager
+  Bull <-> Bear: 固定2轮
+  Bull -> RM
+  Bear -> RM
+}
+
+ExecLayer: 执行层 (固定轮次) {
+  style.fill: "#e3f2fd"
+  Trader
+  Risky
+  Safe
+  Neutral
+  RiskMgr: Risk Manager
+  Output: BUY / SELL / HOLD {
+    shape: parallelogram
+  }
+  Trader -> Risky
+  Trader -> Safe
+  Trader -> Neutral
+  Risky -> RiskMgr
+  Safe -> RiskMgr
+  Neutral -> RiskMgr
+  RiskMgr -> Output
+}
+
+Infra: 基础设施层 {
+  style.fill: "#f3e5f5"
+  BM25: BM25 (内存词法检索, rank_bm25)
+  LLM: |md
+    LLM: 仅2层 quick_think / deep_think
+    所有同层Agent共享同一模型
+  |
+}
+
+Missing: |md
+  ❌ 无持仓管理  ❌ 无可观测性  ❌ 无状态持久化
+  ❌ 无价值投资  ❌ 无专家系统  ❌ 无财报跟踪
+| {
+  style.fill: "#fee"
+  style.stroke: "#f66"
+  style.font-color: "#c00"
+}
+
+DataLayer -> AnalystLayer -> ResearchLayer -> ExecLayer

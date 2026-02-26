@@ -1,0 +1,96 @@
+# TradingAgents Infrastructure Stack
+# PostgreSQL with pgvector for unified Store + Checkpoint + Database
+#
+# Usage:
+#   docker compose up -d           # Start services
+#   docker compose logs -f         # View logs
+#   docker compose down            # Stop services
+#   docker compose down -v         # Stop and remove volumes
+#
+# Environment variables (create .env file or export):
+#   POSTGRES_USER=tradingagents
+#   POSTGRES_PASSWORD=your_secure_password
+#   POSTGRES_DB=tradingagents
+#
+# Connection URL for TradingAgents config:
+#   TRADINGAGENTS_POSTGRES_URL=postgresql://tradingagents:your_password@localhost:5432/tradingagents
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: tradingagents-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tradingagents}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tradingagents_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-tradingagents}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tradingagents} -d ${POSTGRES_DB:-tradingagents}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Performance tuning for development
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "work_mem=64MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "max_connections=100"
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tradingagents-pgadmin
+    restart: unless-stopped
+    profiles:
+      - admin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@tradingagents.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Optional: Langfuse for observability
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: tradingagents-langfuse
+    restart: unless-stopped
+    profiles:
+      - observability
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradingagents}:${POSTGRES_PASSWORD:-tradingagents_dev}@postgres:5432/${POSTGRES_DB:-tradingagents}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme}
+      NEXTAUTH_URL: http://localhost:3000
+      SALT: ${LANGFUSE_SALT:-changeme}
+    ports:
+      - "${LANGFUSE_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  default:
+    name: tradingagents-network

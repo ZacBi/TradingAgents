@@ -1,0 +1,67 @@
+# TradingAgents Model Routing Configuration
+# Defines model aliases, role-based profiles, and fallback chains.
+# Alias references use ${alias_name} syntax.
+
+model_aliases:
+  # Google
+  gemini_flash: "gemini-3-flash-preview"
+  gemini_pro: "gemini-3-pro-preview"
+  gemini_25_pro: "gemini-2.5-pro"
+  # Qwen / DashScope
+  qwen_turbo: "qwen3-turbo"
+  qwen_max: "qwen3-max"
+  qwen_plus: "qwen3.5-plus"
+  # OpenAI
+  gpt_mini: "gpt-5-mini"
+  gpt_std: "gpt-5.1"
+  gpt_top: "gpt-5.2"
+  gpt_reasoning: "o4-mini"
+  # Anthropic
+  haiku: "claude-haiku-4-5"
+  sonnet: "claude-sonnet-4-5"
+  opus: "claude-opus-4-5"
+  # DeepSeek
+  deepseek_v3: "deepseek-v3"
+  deepseek_r2: "deepseek-r2"
+  # Local (Ollama)
+  llama_small: "llama-4-8b"
+  llama_medium: "llama-4-70b"
+
+# Role types used by agent nodes:
+#   data_analyst   - Analysts (Market/Social/News/Fundamentals)
+#   researcher     - Bull/Bear Researcher
+#   expert         - Expert investment agents (Buffett, Munger, etc.)
+#   judge          - Research Manager, Risk Judge
+#   trader         - Trader agent
+#   signal         - Signal processor, reflection
+
+profiles:
+  cost_saving:
+    data_analyst: "${gemini_flash}"
+    researcher: "${qwen_turbo}"
+    expert: "${gemini_pro}"
+    trader: "${qwen_turbo}"
+    judge: "${qwen_max}"
+    signal: "${gemini_flash}"
+    fallback_chain: ["${deepseek_v3}", "${qwen_turbo}", "${gemini_flash}"]
+
+  balanced:
+    data_analyst: "${gemini_flash}"
+    researcher: "${sonnet}"
+    expert: "${gemini_pro}"
+    trader: "${sonnet}"
+    judge: "${gpt_std}"
+    signal: "${gemini_flash}"
+    fallback_chain: ["${deepseek_v3}", "${gemini_flash}"]
+
+  best_quality:
+    data_analyst: "${gpt_std}"
+    researcher: "${opus}"
+    expert: "${gemini_25_pro}"
+    trader: "${opus}"
+    judge: "${gpt_top}"
+    signal: "${gpt_mini}"
+    fallback_chain: ["${sonnet}", "${gemini_pro}"]
+
+# Which profile to use when model_routing is enabled.
+active_profile: "balanced"

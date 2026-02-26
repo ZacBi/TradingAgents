@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+*tests*/
 
 # PyInstaller
 #   Usually these files are written by a python script from a template
@@ -75,6 +76,9 @@ docs/_build/
 .pybuilder/
 target/
 
+# TradingAgents: run output / state logs
+eval_results/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -98,7 +102,7 @@ ipython_config.py
 #   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
-# uv.lock
+uv.lock
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -213,10 +217,87 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
-.streamlit/secrets.toml
+.streamlit/
+
+# LangChain/LangGraph
+.checkpoints/
+.graphs/
+
+# Trading data
+portfolio.json
+positions.json
+trades.json
+
+# API keys and secrets (already covered by .env but being explicit)
+secrets.yaml
+api_keys.json
+credentials.json
 
 # Cache
 **/data_cache/
+.cache/
+.tmp/
+*.tmp
+*.log
 
-
+# macOS
 **/.DS_Store
+.DS_Store
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# TradingAgents specific
+*.db
+*.sqlite
+*.sqlite3
+checkpoints/
+chroma_db/
+
+# Qwen Chat
+.qwen/
+
+# Model files (large)
+*.onnx
+*.pt
+*.pth
+*.bin
+*.gguf
+*.safetensors
+models/
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local configuration
+.local/
+config.local.yaml
+settings.local.py
+
+# Generated files
+generated/
+auto_generated/

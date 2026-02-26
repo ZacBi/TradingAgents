@@ -4,37 +4,202 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tradingagents"
-version = "0.2.0"
+version = "0.2.1"
 description = "TradingAgents: Multi-Agents LLM Financial Trading Framework"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Yijia Xiao", email = "yxiao@cs.ucla.edu" },
+    { name = "Edward Sun", email = "edsun@seas.upenn.edu" },
+    { name = "Di Luo", email = "di.luo@nyu.edu" },
+    { name = "Wei Wang", email = "wei.wang@nyu.edu" },
+]
+maintainers = [
+    { name = "Tauric Research Community", email = "contact@tauric.ai" },
+    { name = "Zac Bi", email = "zacbi@outlook.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = [
+    "trading",
+    "financial",
+    "multi-agent",
+    "llm",
+    "langchain",
+    "langgraph",
+    "artificial-intelligence",
+    "machine-learning",
+    "quantitative-finance",
+    "algorithmic-trading",
+]
 dependencies = [
-    "langchain-core>=0.3.81",
-    "backtrader>=1.9.78.123",
-    "chainlit>=2.5.5",
+    "langchain-core>=0.3.83",
     "langchain-anthropic>=0.3.15",
     "langchain-experimental>=0.3.4",
     "langchain-google-genai>=2.1.5",
     "langchain-openai>=0.3.23",
-    "langgraph>=0.4.8",
+    "langgraph>=1.0.0",
+    "backtrader>=1.9.78.123",
+    "chainlit>=2.5.5",
     "pandas>=2.3.0",
+    "pandas-ta>=0.3.14b",
     "parsel>=1.10.0",
+    "pyyaml>=6.0",
     "pytz>=2025.2",
     "questionary>=2.1.0",
-    "rank-bm25>=0.2.2",
     "redis>=6.2.0",
     "requests>=2.32.4",
     "rich>=14.0.0",
     "typer>=0.21.0",
-    "setuptools>=80.9.0",
-    "stockstats>=0.6.5",
     "tqdm>=4.67.1",
     "typing-extensions>=4.14.0",
     "yfinance>=0.2.63",
+    "langchain>=1.2.10",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.2.1",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/TauricResearch/TradingAgents"
+Documentation = "https://github.com/TauricResearch/TradingAgents#readme"
+Repository = "https://github.com/TauricResearch/TradingAgents.git"
+Issues = "https://github.com/TauricResearch/TradingAgents/issues"
+Changelog = "https://github.com/TauricResearch/TradingAgents/releases"
+Paper = "https://arxiv.org/abs/2412.20138"
+
+[project.optional-dependencies]
+observability = [
+    "langfuse>=2.0",
+    "opentelemetry-api>=1.0.0",
+    "opentelemetry-sdk>=1.0.0",
+]
+litellm = ["litellm>=1.0"]
+postgres = [
+    "psycopg[binary]>=3.1.0",
+    "pgvector>=0.3.0",
+    "langgraph-checkpoint-postgres>=2.0.0",
+]
+data-sources = [
+    "fredapi>=0.5.0",
+    "finnhub-python>=2.4.0",
+    "praw>=7.7.0",
+    "longport>=1.0.0",
+]
+dashboard = ["streamlit>=1.28.0", "plotly>=5.0.0", "altair>=5.0.0"]
+api = ["fastapi>=0.104.0", "uvicorn>=0.24.0", "starlette>=0.27.0"]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.15.2",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+    "types-requests>=2.0.0",
+]
+testing = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "hypothesis>=6.0.0",
+    "langchain-community>=0.3.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocstrings[python]>=0.20.0",
 ]
 
 [project.scripts]
-tradingagents = "cli.main:app"
+tradingagents = "tradingagents.cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["tradingagents*", "cli*"]
+include = ["tradingagents*"]
+exclude = ["tests*", "docs*", "examples*"]
+
+[tool.setuptools.package-data]
+tradingagents = ["py.typed", "**/*.yaml", "**/*.json", "**/*.txt", "cli/static/*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+    "slow: slow running tests",
+    "online: tests requiring internet connection",
+]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 188
+target-version = ['py313']
+skip-string-normalization = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+extend-ignore = [
+    "E501",   # line too long, handled by formatter
+    "B008",   # do not perform function calls in argument defaults
+]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+show_error_codes = true
+
+[tool.coverage.run]
+source = ["tradingagents"]
+omit = ["*/tests/*", "*/venv/*", "*/.venv/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.15.2",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+]

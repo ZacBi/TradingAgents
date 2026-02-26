@@ -1,7 +1,8 @@
 """yfinance-based news data fetching functions."""
 
-import yfinance as yf
 from datetime import datetime
+
+import yfinance as yf
 from dateutil.relativedelta import relativedelta
 
 
@@ -92,6 +93,18 @@ def get_news_yfinance(
                 news_str += f"Link: {data['link']}\n"
             news_str += "\n"
             filtered_count += 1
+            try:
+                from tradingagents.graph.lineage import try_record_raw_news
+                try_record_raw_news(
+                    ticker=ticker,
+                    source="yfinance",
+                    title=data.get("title"),
+                    content=data.get("summary"),
+                    url=data.get("link"),
+                    published_at=data["pub_date"].isoformat() if data.get("pub_date") else None,
+                )
+            except Exception:
+                pass
 
         if filtered_count == 0:
             return f"No news found for {ticker} between {start_date} and {end_date}"
@@ -100,6 +113,57 @@ def get_news_yfinance(
 
     except Exception as e:
         return f"Error fetching news for {ticker}: {str(e)}"
+
+
+_GLOBAL_NEWS_QUERIES = [
+    "stock market economy",
+    "Federal Reserve interest rates",
+    "inflation economic outlook",
+    "global markets trading",
+]
+
+
+def _article_title(article: dict) -> str:
+    """Extract title from article (flat or nested)."""
+    if "content" in article:
+        return _extract_article_data(article)["title"]
+    return article.get("title", "")
+
+
+def _collect_global_articles(limit: int) -> list[dict]:
+    """Collect deduplicated global news articles from search queries."""
+    all_news = []
+    seen_titles = set()
+    for query in _GLOBAL_NEWS_QUERIES:
+        search = yf.Search(query=query, news_count=limit, enable_fuzzy_query=True)
+        if not search.news:
+            continue
+        for article in search.news:
+            title = _article_title(article)
+            if title and title not in seen_titles:
+                seen_titles.add(title)
+                all_news.append(article)
+        if len(all_news) >= limit:
+            break
+    return all_news
+
+
+def _format_article_line(article: dict) -> str:
+    """Format a single article as markdown line."""
+    if "content" in article:
+        data = _extract_article_data(article)
+        title, publisher, link, summary = data["title"], data["publisher"], data["link"], data["summary"]
+    else:
+        title = article.get("title", "No title")
+        publisher = article.get("publisher", "Unknown")
+        link = article.get("link", "")
+        summary = ""
+    line = f"### {title} (source: {publisher})\n"
+    if summary:
+        line += f"{summary}\n"
+    if link:
+        line += f"Link: {link}\n"
+    return line + "\n"
 
 
 def get_global_news_yfinance(
@@ -118,73 +182,13 @@ def get_global_news_yfinance(
     Returns:
         Formatted string containing global news articles
     """
-    # Search queries for macro/global news
-    search_queries = [
-        "stock market economy",
-        "Federal Reserve interest rates",
-        "inflation economic outlook",
-        "global markets trading",
-    ]
-
-    all_news = []
-    seen_titles = set()
-
     try:
-        for query in search_queries:
-            search = yf.Search(
-                query=query,
-                news_count=limit,
-                enable_fuzzy_query=True,
-            )
-
-            if search.news:
-                for article in search.news:
-                    # Handle both flat and nested structures
-                    if "content" in article:
-                        data = _extract_article_data(article)
-                        title = data["title"]
-                    else:
-                        title = article.get("title", "")
-
-                    # Deduplicate by title
-                    if title and title not in seen_titles:
-                        seen_titles.add(title)
-                        all_news.append(article)
-
-            if len(all_news) >= limit:
-                break
-
+        all_news = _collect_global_articles(limit)
         if not all_news:
             return f"No global news found for {curr_date}"
-
-        # Calculate date range
         curr_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-        start_dt = curr_dt - relativedelta(days=look_back_days)
-        start_date = start_dt.strftime("%Y-%m-%d")
-
-        news_str = ""
-        for article in all_news[:limit]:
-            # Handle both flat and nested structures
-            if "content" in article:
-                data = _extract_article_data(article)
-                title = data["title"]
-                publisher = data["publisher"]
-                link = data["link"]
-                summary = data["summary"]
-            else:
-                title = article.get("title", "No title")
-                publisher = article.get("publisher", "Unknown")
-                link = article.get("link", "")
-                summary = ""
-
-            news_str += f"### {title} (source: {publisher})\n"
-            if summary:
-                news_str += f"{summary}\n"
-            if link:
-                news_str += f"Link: {link}\n"
-            news_str += "\n"
-
+        start_date = (curr_dt - relativedelta(days=look_back_days)).strftime("%Y-%m-%d")
+        news_str = "".join(_format_article_line(a) for a in all_news[:limit])
         return f"## Global Market News, from {start_date} to {curr_date}:\n\n{news_str}"
-
     except Exception as e:
         return f"Error fetching global news: {str(e)}"

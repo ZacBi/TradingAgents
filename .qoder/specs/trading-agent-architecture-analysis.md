@@ -3,8 +3,8 @@
 ## 项目概览
 
 **项目**: TradingAgents - 多智能体LLM金融交易框架
-**核心架构**: LangGraph编排 + 10个专业Agent + ChromaDB记忆
-**数据源**: YFinance, Finnhub, Reddit, Google News, SimFin
+**核心架构**: LangGraph编排 + 12个专业Agent + BM25记忆
+**数据源**: YFinance, Alpha Vantage
 **LLM支持**: OpenAI, Anthropic, Google Gemini, Ollama, OpenRouter
 
 ### 技术栈
@@ -13,28 +13,27 @@
 |------|---------|---------|
 | **工作流编排** | LangGraph StateGraph | >= 0.4.8 |
 | **LLM 框架** | LangChain (openai/anthropic/google-genai) | 多版本 |
-| **向量存储** | ChromaDB (内存模式) | - |
-| **嵌入模型** | OpenAI `text-embedding-3-small` / Ollama `nomic-embed-text` | - |
+| **记忆检索** | BM25 (rank_bm25, 内存模式) | - |
 | **回测** | Backtrader (仅依赖，未集成) | - |
-| **数据源** | Yahoo Finance, Finnhub, Reddit/PRAW, Google News, SimFin, AKShare, Tushare | - |
-| **UI** | Chainlit Web UI + Rich CLI | - |
+| **数据源** | Yahoo Finance, Alpha Vantage | - |
+| **UI** | Rich CLI (Typer + Rich + Questionary) | - |
 
 ### 核心模块与文件
 
 | 模块 | 关键文件 | 职责 |
 |------|---------|------|
-| **图编排** | `tradingagents/graph/trading_graph.py` (255行) | 主Orchestrator，初始化LLM/记忆/工具/图 |
-| **图设置** | `tradingagents/graph/setup.py` (205行) | 构建LangGraph StateGraph，定义节点和边 |
-| **条件逻辑** | `tradingagents/graph/conditional_logic.py` | 控制辩论轮次、工具调用循环 |
+| **图编排** | `tradingagents/graph/trading_graph.py` (283行) | 主Orchestrator，初始化LLM/记忆/工具/图 |
+| **图设置** | `tradingagents/graph/setup.py` (202行) | 构建LangGraph StateGraph，定义节点和边 |
+| **条件逻辑** | `tradingagents/graph/conditional_logic.py` (67行) | 控制辩论轮次、工具调用循环 |
 | **信号处理** | `tradingagents/graph/signal_processing.py` | 从详细报告提取BUY/SELL/HOLD |
-| **反思学习** | `tradingagents/graph/reflection.py` (122行) | 基于实际收益进行事后反思 |
+| **反思学习** | `tradingagents/graph/reflection.py` (121行) | 基于实际收益进行事后反思 |
 | **分析师** | `tradingagents/agents/analysts/*.py` (4个) | Market / Social / News / Fundamentals |
 | **研究员** | `tradingagents/agents/researchers/*.py` (2个) | Bull / Bear Researcher |
 | **风险管理** | `tradingagents/agents/risk_mgmt/*.py` (3个) | Aggressive / Conservative / Neutral |
 | **管理层** | `tradingagents/agents/managers/*.py` (2个) | Research Manager / Risk Manager |
 | **交易员** | `tradingagents/agents/trader/trader.py` | 生成交易提案 |
-| **记忆系统** | `tradingagents/agents/utils/memory.py` (114行) | ChromaDB + Embedding向量记忆 |
-| **工具箱** | `tradingagents/agents/utils/agent_utils.py` (419行) | Toolkit类，19+ 个@tool方法 |
+| **记忆系统** | `tradingagents/agents/utils/memory.py` (144行) | BM25词法相似度记忆 |
+| **工具箱** | `tradingagents/agents/utils/agent_utils.py` (37行) + `*_tools.py` (4个文件) | 聚合层 + 9个@tool方法分布于独立工具模块 |
 | **配置** | `tradingagents/default_config.py` | 全局配置（LLM/辩论轮数/工具模式） |
 
 ### 完整执行流程
@@ -100,9 +99,9 @@ END
 
 | 问题点 | 描述 | 优先级 |
 |--------|------|--------|
-| **简单向量检索** | 仅使用余弦相似度，无时间衰减、重要性加权 | P1 |
+| **简单词法检索** | 仅使用BM25词频匹配，无语义理解、无时间衰减、无重要性加权 | P1 |
 | **无分层记忆** | 混合短期交易记忆与长期市场规律 | P1 |
-| **非持久化** | `chromadb.Client()` 纯内存模式，重启即丢失 | P0 |
+| **非持久化** | 内存列表存储(`self.documents`)，重启即丢失 | P0 |
 | **记忆隔离** | 5个Agent记忆完全隔离，无跨Agent知识共享 | P1 |
 
 ---
@@ -118,7 +117,7 @@ END
 | 新Agent | 替换现有? | 集成方式 | 代码层面原因 |
 |---------|----------|---------|-------------|
 | **Expert Team**<br>(Buffett/Munger/Lynch等) | **否** | 新增"价值队伍"并行节点 | `InvestDebateState` 硬编码 `bull_history`/`bear_history` 二元结构；<br>`should_continue_debate()` 硬编码 Bull↔Bear 路由；<br>Expert做独立评估 ≠ 对抗性辩论 |
-| **Deep Research** | **否** | 新增POST-STAGE节点 | 4个Analyst各有专项工具链（YFin/Reddit/Finnhub/SimFin），功能互补非重叠；<br>Deep Research做综合交叉验证，可引用4份报告增强深度 |
+| **Deep Research** | **否** | 新增POST-STAGE节点 | 4个Analyst各有专项工具链（YFinance/Alpha Vantage），功能互补非重叠；<br>Deep Research做综合交叉验证，可引用4份报告增强深度 |
 
 ### 2.2 升级后工作流
 
@@ -829,41 +828,41 @@ flowchart LR
 ## 十二、实施路线图
 
 ### 阶段0: 环境准备
-- [ ] 升级LangGraph到1.0
-- [ ] 部署LiteLLM网关 + 配置多平台密钥
-- [ ] 部署Langfuse自托管实例
-- [ ] 设置SQLite数据库
+- [x] 升级LangGraph到1.0
+- [x] 部署LiteLLM网关 + 配置多平台密钥
+- [x] 部署Langfuse自托管实例
+- [x] 设置SQLite数据库
 
 ### 阶段1: 核心架构升级
-- [ ] LangGraph 1.0 Checkpointing集成
-- [ ] Langfuse追踪回调接入
-- [ ] LiteLLM分层模型配置（YAML配置化）
-- [ ] 持仓管理数据库实现
-- [ ] 重构 `trading_graph.py` 支持模型路由
+- [x] LangGraph 1.0 Checkpointing集成
+- [x] Langfuse追踪回调接入
+- [x] LiteLLM分层模型配置（YAML配置化）
+- [x] 持仓管理数据库实现
+- [x] 重构 `trading_graph.py` 支持模型路由
 
 ### 阶段2: 数据源升级
-- [ ] Yahoo Finance增强（财报日期、估值指标、机构持仓）
-- [ ] 长桥Longport API集成
-- [ ] FRED宏观经济数据接入
+- [x] Yahoo Finance增强（财报日期、估值指标、机构持仓）
+- [x] 长桥Longport API集成
+- [x] FRED宏观经济数据接入
 
 ### 阶段3: Agent升级
-- [ ] 可扩展专家框架（注册机制 + 动态选择器）
-- [ ] 首批专家Agent: Buffett, Munger, Lynch, Livermore, Graham
-- [ ] 动态收敛辩论机制
-- [ ] Deep Research集成（基于open_deep_research）
-- [ ] 财报跟踪Agent
+- [x] 可扩展专家框架（注册机制 + 动态选择器）
+- [x] 首批专家Agent: Buffett, Munger, Lynch, Livermore, Graham
+- [x] 动态收敛辩论机制
+- [x] Deep Research集成（基于open_deep_research）
+- [x] 财报跟踪Agent
 
 ### 阶段4: 价值投资框架
-- [ ] DCF估值模型
-- [ ] 护城河评估模块
-- [ ] 安全边际计算
-- [ ] 价值投资决策流程集成
+- [x] DCF估值模型
+- [x] 护城河评估模块
+- [x] 安全边际计算
+- [x] 价值投资决策流程集成
 
 ### 阶段5: 优化与测试
-- [ ] Token成本优化验证
-- [ ] 回测框架
-- [ ] 端到端测试
-- [ ] Streamlit Dashboard（可选）
+- [x] Token成本优化验证
+- [x] 回测框架
+- [x] 端到端测试
+- [x] Streamlit Dashboard（可选）
 
 ---
 
@@ -925,6 +924,13 @@ flowchart LR
 - **成本追踪**: 在Langfuse中验证Token消耗统计
 - **Prompt改进验证**: 对比改进前后的决策准确率和Sharpe Ratio
 - **记忆系统验证**: 验证持久化后重启不丢失，检索相关性评分
+
+### 阶段5 验证说明
+
+- **Token 成本验证**: 运行一次 CLI 分析后，在「Analysis Complete」下方会打印 Run statistics（LLM calls, Tool calls, Tokens in/out, Estimated cost USD）。可选：在 Langfuse 中按 `agent_decisions.langfuse_trace_id` 查看真实用量与成本。
+- **回测**: 使用 `uv run python -m cli.main backtest --ticker AAPL --start 2024-01-01 --end 2024-12-31 [--db-path tradingagents.db]` 或 `--csv decisions.csv`（CSV 列：ticker, trade_date, final_decision）。输出总收益、年化、夏普、最大回撤、胜率等。
+- **端到端测试**: 执行 `uv run pytest tests/e2e/ -v`。使用 mock LLM（FakeListChatModel），无需真实 API；安装 `uv sync --extra testing` 以包含 langchain-community。
+- **Streamlit Dashboard**: 安装 `uv sync --extra dashboard` 后执行 `uv run streamlit run dashboard/app.py`，可查看决策列表、NAV 曲线及说明。
 
 ---
 

@@ -1,144 +1,280 @@
-"""Financial situation memory using BM25 for lexical similarity matching.
+"""Financial situation memory using LangGraph Store for semantic similarity matching.
 
-Uses BM25 (Best Matching 25) algorithm for retrieval - no API calls,
-no token limits, works offline with any LLM provider.
+Uses LangGraph's BaseStore API with OpenAI embeddings for semantic retrieval.
+Supports both InMemoryStore (development) and PostgresStore (production).
 """
 
-from rank_bm25 import BM25Okapi
-from typing import List, Tuple
-import re
+import logging
+import uuid
+from collections.abc import Callable
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class FinancialSituationMemory:
-    """Memory system for storing and retrieving financial situations using BM25."""
+    """Memory system for storing and retrieving financial situations using LangGraph Store.
 
-    def __init__(self, name: str, config: dict = None):
+    This class wraps LangGraph's BaseStore API to provide semantic similarity search
+    for financial situations and their corresponding recommendations.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        store: Any | None = None,
+        embedder: Callable[[str], list[float]] | None = None,
+    ):
         """Initialize the memory system.
 
         Args:
-            name: Name identifier for this memory instance
-            config: Configuration dict (kept for API compatibility, not used for BM25)
+            name: Name identifier for this memory instance (used as namespace).
+            store: LangGraph BaseStore instance (InMemoryStore or PostgresStore).
+            embedder: Callable that converts text to embedding vector.
         """
         self.name = name
-        self.documents: List[str] = []
-        self.recommendations: List[str] = []
-        self.bm25 = None
+        self.store = store
+        self.embedder = embedder
+        self._namespace = ("memories", name)
 
-    def _tokenize(self, text: str) -> List[str]:
-        """Tokenize text for BM25 indexing.
+        # Track if store is available
+        self._store_available = store is not None and embedder is not None
 
-        Simple whitespace + punctuation tokenization with lowercasing.
-        """
-        # Lowercase and split on non-alphanumeric characters
-        tokens = re.findall(r'\b\w+\b', text.lower())
-        return tokens
+        if not self._store_available:
+            logger.warning(
+                "FinancialSituationMemory '%s' initialized without store/embedder. "
+                "Memory operations will be no-ops.",
+                name,
+            )
 
-    def _rebuild_index(self):
-        """Rebuild the BM25 index after adding documents."""
-        if self.documents:
-            tokenized_docs = [self._tokenize(doc) for doc in self.documents]
-            self.bm25 = BM25Okapi(tokenized_docs)
-        else:
-            self.bm25 = None
-
-    def add_situations(self, situations_and_advice: List[Tuple[str, str]]):
+    def add_situations(self, situations_and_advice: list[tuple[str, str]]) -> None:
         """Add financial situations and their corresponding advice.
 
         Args:
-            situations_and_advice: List of tuples (situation, recommendation)
+            situations_and_advice: List of tuples (situation, recommendation).
         """
+        if not self._store_available:
+            return
+
         for situation, recommendation in situations_and_advice:
-            self.documents.append(situation)
-            self.recommendations.append(recommendation)
+            try:
+                memory_id = str(uuid.uuid4())
+                value = {
+                    "situation": situation,
+                    "recommendation": recommendation,
+                }
+                self.store.put(self._namespace, memory_id, value)
+                logger.debug(
+                    "Added memory to '%s': %s...",
+                    self.name,
+                    situation[:50],
+                )
+            except Exception as e:
+                logger.error("Failed to add memory to '%s': %s", self.name, e)
 
-        # Rebuild BM25 index with new documents
-        self._rebuild_index()
-
-    def get_memories(self, current_situation: str, n_matches: int = 1) -> List[dict]:
-        """Find matching recommendations using BM25 similarity.
+    def get_memories(self, current_situation: str, n_matches: int = 1) -> list[dict]:
+        """Find matching recommendations using semantic similarity.
 
         Args:
-            current_situation: The current financial situation to match against
-            n_matches: Number of top matches to return
+            current_situation: The current financial situation to match against.
+            n_matches: Number of top matches to return.
 
         Returns:
-            List of dicts with matched_situation, recommendation, and similarity_score
+            List of dicts with matched_situation, recommendation, and similarity_score.
         """
-        if not self.documents or self.bm25 is None:
+        if not self._store_available:
             return []
 
-        # Tokenize query
-        query_tokens = self._tokenize(current_situation)
+        try:
+            # Use LangGraph Store's search API with semantic matching
+            results = self.store.search(
+                self._namespace,
+                query=current_situation,
+                limit=n_matches,
+            )
 
-        # Get BM25 scores for all documents
-        scores = self.bm25.get_scores(query_tokens)
+            # Convert to legacy format for compatibility
+            memories = []
+            for item in results:
+                value = item.value
+                # LangGraph Store returns score as item.score (0-1 range)
+                score = getattr(item, "score", 0.5)
+                memories.append({
+                    "matched_situation": value.get("situation", ""),
+                    "recommendation": value.get("recommendation", ""),
+                    "similarity_score": score,
+                })
 
-        # Get top-n indices sorted by score (descending)
-        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:n_matches]
+            return memories
 
-        # Build results
-        results = []
-        max_score = max(scores) if max(scores) > 0 else 1  # Normalize scores
+        except Exception as e:
+            logger.error("Failed to search memories in '%s': %s", self.name, e)
+            return []
 
-        for idx in top_indices:
-            # Normalize score to 0-1 range for consistency
-            normalized_score = scores[idx] / max_score if max_score > 0 else 0
-            results.append({
-                "matched_situation": self.documents[idx],
-                "recommendation": self.recommendations[idx],
-                "similarity_score": normalized_score,
-            })
+    def clear(self) -> None:
+        """Clear all stored memories.
 
-        return results
+        Note: LangGraph Store doesn't have a native clear method.
+        This is a no-op for now; memories persist until explicitly deleted.
+        """
+        logger.warning(
+            "clear() called on '%s' but LangGraph Store doesn't support bulk delete. "
+            "Memories will persist.",
+            self.name,
+        )
 
-    def clear(self):
-        """Clear all stored memories."""
-        self.documents = []
-        self.recommendations = []
-        self.bm25 = None
+
+def create_memory_store(config: dict) -> Any | None:
+    """Create a LangGraph Store based on configuration.
+
+    Args:
+        config: Configuration dict with store_enabled, store_backend, etc.
+
+    Returns:
+        LangGraph BaseStore instance or None if disabled.
+    """
+    if not config.get("store_enabled", True):
+        logger.info("LangGraph Store disabled by configuration.")
+        return None
+
+    backend = config.get("store_backend", "memory")
+
+    try:
+        if backend == "memory":
+            from langgraph.store.memory import InMemoryStore
+
+            # Get embedding configuration
+            embedder = create_embedder(config)
+            if embedder is None:
+                # Create store without indexing (no semantic search)
+                store = InMemoryStore()
+                logger.info("Created InMemoryStore without semantic indexing.")
+            else:
+                # Create store with semantic indexing
+                dims = config.get("store_embedding_dimension", 1536)
+                store = InMemoryStore(
+                    index={
+                        "embed": embedder,
+                        "dims": dims,
+                    }
+                )
+                logger.info("Created InMemoryStore with semantic indexing (dims=%d).", dims)
+            return store
+
+        elif backend == "postgres":
+            from langgraph.store.postgres import PostgresStore
+
+            # Get PostgreSQL URL (prefer unified, fallback to store-specific)
+            pg_url = config.get("postgres_url") or config.get("store_postgres_url")
+            if not pg_url:
+                logger.error("PostgreSQL URL not configured for store backend.")
+                return None
+
+            # Get embedding configuration
+            embedder = create_embedder(config)
+            dims = config.get("store_embedding_dimension", 1536)
+
+            if embedder is None:
+                store = PostgresStore.from_conn_string(pg_url)
+            else:
+                store = PostgresStore.from_conn_string(
+                    pg_url,
+                    index={
+                        "embed": embedder,
+                        "dims": dims,
+                    },
+                )
+            logger.info("Created PostgresStore with semantic indexing.")
+            return store
+
+        else:
+            logger.error("Unknown store_backend: %s", backend)
+            return None
+
+    except ImportError as e:
+        logger.error("Failed to import store backend '%s': %s", backend, e)
+        return None
+    except Exception as e:
+        logger.error("Failed to create store backend '%s': %s", backend, e)
+        return None
+
+
+def create_embedder(config: dict) -> Callable[[str], list[float]] | None:
+    """Create an embedding function based on configuration.
+
+    Args:
+        config: Configuration dict with store_embedding_provider, store_embedding_model.
+
+    Returns:
+        Callable that converts text to embedding vector, or None.
+    """
+    provider = config.get("store_embedding_provider", "openai")
+    model = config.get("store_embedding_model", "text-embedding-3-small")
+
+    try:
+        if provider == "openai":
+            from langchain_openai import OpenAIEmbeddings
+
+            embeddings = OpenAIEmbeddings(model=model)
+            logger.info("Created OpenAI embedder with model '%s'.", model)
+            return embeddings
+
+        elif provider == "sentence_transformers":
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+
+            embeddings = HuggingFaceEmbeddings(model_name=model)
+            logger.info("Created SentenceTransformers embedder with model '%s'.", model)
+            return embeddings
+
+        else:
+            logger.warning("Unknown embedding provider: %s", provider)
+            return None
+
+    except ImportError as e:
+        logger.error("Failed to import embedder for '%s': %s", provider, e)
+        return None
+    except Exception as e:
+        logger.error("Failed to create embedder for '%s': %s", provider, e)
+        return None
 
 
 if __name__ == "__main__":
-    # Example usage
-    matcher = FinancialSituationMemory("test_memory")
+    # Example usage with InMemoryStore
+    from tradingagents.config import DEFAULT_CONFIG
+
+    config = DEFAULT_CONFIG.copy()
+    config["store_backend"] = "memory"
+    config["store_embedding_provider"] = "openai"
+
+    store = create_memory_store(config)
+    embedder = create_embedder(config)
+
+    matcher = FinancialSituationMemory("test_memory", store, embedder)
 
     # Example data
     example_data = [
         (
             "High inflation rate with rising interest rates and declining consumer spending",
-            "Consider defensive sectors like consumer staples and utilities. Review fixed-income portfolio duration.",
+            "Consider defensive sectors like consumer staples and utilities.",
         ),
         (
-            "Tech sector showing high volatility with increasing institutional selling pressure",
-            "Reduce exposure to high-growth tech stocks. Look for value opportunities in established tech companies with strong cash flows.",
+            "Tech sector showing high volatility with increasing institutional selling",
+            "Reduce exposure to high-growth tech stocks.",
         ),
         (
             "Strong dollar affecting emerging markets with increasing forex volatility",
-            "Hedge currency exposure in international positions. Consider reducing allocation to emerging market debt.",
-        ),
-        (
-            "Market showing signs of sector rotation with rising yields",
-            "Rebalance portfolio to maintain target allocations. Consider increasing exposure to sectors benefiting from higher rates.",
+            "Hedge currency exposure in international positions.",
         ),
     ]
 
-    # Add the example situations and recommendations
     matcher.add_situations(example_data)
 
-    # Example query
-    current_situation = """
-    Market showing increased volatility in tech sector, with institutional investors
-    reducing positions and rising interest rates affecting growth stock valuations
-    """
+    # Query
+    current_situation = "Market showing increased volatility in tech sector"
+    recommendations = matcher.get_memories(current_situation, n_matches=2)
 
-    try:
-        recommendations = matcher.get_memories(current_situation, n_matches=2)
-
-        for i, rec in enumerate(recommendations, 1):
-            print(f"\nMatch {i}:")
-            print(f"Similarity Score: {rec['similarity_score']:.2f}")
-            print(f"Matched Situation: {rec['matched_situation']}")
-            print(f"Recommendation: {rec['recommendation']}")
-
-    except Exception as e:
-        print(f"Error during recommendation: {str(e)}")
+    for i, rec in enumerate(recommendations, 1):
+        print(f"\nMatch {i}:")
+        print(f"Similarity Score: {rec['similarity_score']:.2f}")
+        print(f"Matched Situation: {rec['matched_situation']}")
+        print(f"Recommendation: {rec['recommendation']}")

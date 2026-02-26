@@ -1,9 +1,11 @@
 import functools
-import time
-import json
+
+from tradingagents.prompts import PromptNames, get_prompt_manager
 
 
 def create_trader(llm, memory):
+    pm = get_prompt_manager()
+
     def trader_node(state, name):
         company_name = state["company_of_interest"]
         investment_plan = state["investment_plan"]
@@ -17,22 +19,20 @@ def create_trader(llm, memory):
 
         past_memory_str = ""
         if past_memories:
-            for i, rec in enumerate(past_memories, 1):
+            for _i, rec in enumerate(past_memories, 1):
                 past_memory_str += rec["recommendation"] + "\n\n"
         else:
             past_memory_str = "No past memories found."
 
-        context = {
-            "role": "user",
-            "content": f"Based on a comprehensive analysis by a team of analysts, here is an investment plan tailored for {company_name}. This plan incorporates insights from current technical market trends, macroeconomic indicators, and social media sentiment. Use this plan as a foundation for evaluating your next trading decision.\n\nProposed Investment Plan: {investment_plan}\n\nLeverage these insights to make an informed and strategic decision.",
-        }
+        parts = pm.get_prompt_parts(PromptNames.TRADER_MAIN, variables={
+            "past_memory_str": past_memory_str,
+            "company_name": company_name,
+            "investment_plan": investment_plan,
+        })
 
         messages = [
-            {
-                "role": "system",
-                "content": f"""You are a trading agent analyzing market data to make investment decisions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation. Do not forget to utilize lessons from past decisions to learn from your mistakes. Here is some reflections from similar situatiosn you traded in and the lessons learned: {past_memory_str}""",
-            },
-            context,
+            {"role": "system", "content": parts["system_template"]},
+            {"role": "user", "content": parts["user_template"]},
         ]
 
         result = llm.invoke(messages)

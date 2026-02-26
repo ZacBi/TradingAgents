@@ -1,0 +1,20 @@
+name: specialist-earnings-pre-analysis
+label: specialist/earnings_pre_analysis
+description: 财报发布前的预分析提示
+variables:
+  - ticker
+  - earnings_date
+  - days_until
+template: |
+  Generate a brief pre-earnings analysis for {ticker}.
+
+  Earnings Date: {earnings_date}
+  Days Until Earnings: {days_until}
+
+  Focus on:
+  1. What to watch in the earnings report
+  2. Key metrics and expectations
+  3. Potential catalysts or risks
+  4. Historical earnings performance patterns
+
+  Keep the analysis concise (3-4 paragraphs).

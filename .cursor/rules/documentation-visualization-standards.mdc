@@ -1,0 +1,32 @@
+---
+description: Documentation and visualization standards - structured tables, Mermaid/D2 diagrams, assets storage
+alwaysApply: true
+---
+
+# Documentation & Visualization Standards
+
+## 1. 结构化表达规范
+
+- **复杂逻辑表格化**：禁止使用长篇大论描述业务规则。
+- **必须使用表格的情境**：
+
+  | 场景     | 描述内容                                   |
+  | :------- | :----------------------------------------- |
+  | 状态机   | 触发动作、前置状态、后置状态               |
+  | API 定义 | 路径、方法、参数说明、错误码               |
+  | 方案对比 | 维度、方案 A、方案 B、优劣势               |
+
+## 2. 绘图技术栈
+
+- **推荐工具**：优先使用 **Mermaid** 或 **D2** (Modern & Layout-aware)。
+- **作图要求**：对使用 D2 还是 Mermaid 需要做出判断：
+  - **D2**：必须另外创建 `.d2` 文件并存于 `assets/`，在文档中引用该文件。
+  - **Mermaid**：可直接在文档中使用代码块（如 ` ```mermaid `）。
+- **强制要求**：
+  - **系统架构图**：必须展示组件拓扑与数据流向。
+  - **业务流程图**：必须包含清晰的开始/结束节点与判断分支。
+  - **交互时序图**：必须标注跨服务调用的关键 Payload。
+
+## 3. 存储规范
+
+- 所有架构文档、图表源文件（`.d2`、`.mmd`）必须存放在项目根目录的 `assets/` 下。
