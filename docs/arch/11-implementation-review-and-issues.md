@@ -29,9 +29,9 @@
 
 ## 2. 发现的问题和瑕疵
 
-### 2.1 严重问题（P0）
+### 2.1 严重问题（P0）✅ 已修复
 
-#### 问题1: RecoveryEngine的checkpoint API使用错误
+#### 问题1: RecoveryEngine的checkpoint API使用错误 ✅ 已修复
 **位置**: `tradingagents/graph/recovery.py:46-49`
 **问题**: 
 ```python
@@ -45,32 +45,36 @@ if checkpoints:
 - `checkpointer.get()` 的参数格式可能不正确
 - 没有正确使用LangGraph的checkpoint API
 
-**修复建议**: 需要查阅LangGraph最新文档，使用正确的API：
-```python
-# 应该使用类似这样的API
-config = {"configurable": {"thread_id": thread_id}}
-checkpoint = self.checkpointer.get(config)
-```
+**修复状态**: ✅ 已修复
+- 使用正确的配置格式 `{"configurable": {"thread_id": thread_id}}`
+- 支持 `get_tuple()` 和 `get()` 两种方法
+- 正确处理checkpoint tuple格式，提取 `channel_values` 或 `values`
+- 改进错误处理和日志记录
 
-#### 问题2: OrderExecutor节点集成不完整
+#### 问题2: OrderExecutor节点集成不完整 ✅ 已修复
 **位置**: `tradingagents/graph/setup.py:143-145, 164-170`
 **问题**:
 - `order_executor` 在 `GraphSetup.__init__` 中没有初始化
 - 在 `setup_graph` 中检查 `hasattr(self, "order_executor")` 但从未设置
 - `trading_graph.py` 中设置了 `self.graph_setup.order_executor`，但时机可能不对
 
-**修复建议**: 
-- 在 `GraphSetup.__init__` 中接受 `order_executor` 参数
-- 或者在 `TradingAgentsGraph` 中创建graph之前设置
+**修复状态**: ✅ 已修复
+- 在 `TradingAgentsGraph` 中，在创建graph之前设置 `order_executor`
+- 确保 `GraphSetup.setup_graph()` 能够正确访问 `order_executor`
+- 修复了edge连接逻辑，确保Order Executor正确插入到工作流中
 
-#### 问题3: 部分Analyst未使用基类
+#### 问题3: 部分Analyst未使用基类 ✅ 已修复
 **位置**: `tradingagents/agents/analysts/news_analyst.py`, `social_media_analyst.py`, `fundamentals_analyst.py`
 **问题**:
 - 只有 `MarketAnalyst` 使用了 `BaseAnalyst`
 - 其他Analyst（News, Social, Fundamentals）仍然是旧实现
 - 代码重复，未统一接口
 
-**修复建议**: 重构所有Analyst使用基类
+**修复状态**: ✅ 已修复
+- 重构 `NewsAnalyst` 使用 `BaseAnalyst`
+- 重构 `SocialMediaAnalyst` 使用 `BaseAnalyst`
+- 重构 `FundamentalsAnalyst` 使用 `BaseAnalyst`
+- 所有Analyst现在统一使用基类，消除代码重复
 
 ### 2.2 中等问题（P1）
 
