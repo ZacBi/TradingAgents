@@ -178,10 +178,6 @@ class TradingAgentsGraph:
             config=self.config,
             prompt_manager=self.prompt_manager,
         )
-        
-        # Phase 3: Pass order executor to graph setup if trading is enabled
-        if self.config.get("trading_enabled", False) and self.order_executor:
-            self.graph_setup.order_executor = self.order_executor
 
         self.propagator = Propagator()
         self.reflector = Reflector(self.quick_thinking_llm)
@@ -205,6 +201,10 @@ class TradingAgentsGraph:
         self.position_manager = None
         if self.config.get("trading_enabled", False):
             self._init_trading()
+        
+        # Pass order_executor to graph_setup BEFORE setting up graph
+        if self.order_executor:
+            self.graph_setup.order_executor = self.order_executor
 
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)

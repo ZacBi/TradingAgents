@@ -125,6 +125,7 @@ class EdgeConnector:
                 from_node, self.conditional_logic.should_continue_risk_analysis, to_options
             )
         
-        # Risk Judge -> Order Executor (if trading enabled) -> END
-        # Order Executor is optional and added by GraphSetup if trading is enabled
+        # Risk Judge -> END (or -> Order Executor -> END if trading enabled)
+        # Order Executor connection is handled in GraphSetup.setup_graph()
+        # We add the default edge here, which will be overridden if Order Executor exists
         workflow.add_edge("Risk Judge", END)

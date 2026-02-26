@@ -33,20 +33,52 @@ class RecoveryEngine:
             thread_id: Thread identifier
             
         Returns:
-            Latest checkpoint state or None if not found
+            Latest checkpoint tuple or None if not found
         """
         if not self.checkpointer:
             self._logger.warning("No checkpointer available for recovery")
             return None
         
         try:
-            # Get latest checkpoint using LangGraph API
-            # Note: This is a simplified version - actual implementation depends on LangGraph API
-            # In practice, you would use checkpointer.get() or similar method
-            checkpoints = list(self.checkpointer.list(thread_id, limit=1))
+            # Use LangGraph checkpoint API with proper configuration format
+            config = {"configurable": {"thread_id": thread_id}}
+            
+            # Get the latest checkpoint using get_tuple (returns checkpoint tuple)
+            # If get_tuple doesn't exist, try get
+            if hasattr(self.checkpointer, "get_tuple"):
+                checkpoint_tuple = self.checkpointer.get_tuple(config)
+                if checkpoint_tuple:
+                    return {
+                        "checkpoint_id": checkpoint_tuple.get("checkpoint_id"),
+                        "parent_checkpoint_id": checkpoint_tuple.get("parent_checkpoint_id"),
+                        "values": checkpoint_tuple.get("channel_values", {}),
+                        "metadata": checkpoint_tuple.get("metadata", {}),
+                    }
+            elif hasattr(self.checkpointer, "get"):
+                # Fallback to get method
+                checkpoint = self.checkpointer.get(config)
+                if checkpoint:
+                    return checkpoint
+            
+            # If no checkpoint found, try listing to see if any exist
+            checkpoints = list(self.checkpointer.list(config, limit=1))
             if checkpoints:
-                checkpoint = checkpoints[0]
-                return self.checkpointer.get({"configurable": {"thread_id": thread_id}})
+                # Use the first checkpoint's ID to get full checkpoint
+                latest_checkpoint_id = checkpoints[0].get("checkpoint_id")
+                if latest_checkpoint_id:
+                    config_with_id = {"configurable": {"thread_id": thread_id, "checkpoint_id": latest_checkpoint_id}}
+                    if hasattr(self.checkpointer, "get_tuple"):
+                        checkpoint_tuple = self.checkpointer.get_tuple(config_with_id)
+                        if checkpoint_tuple:
+                            return {
+                                "checkpoint_id": checkpoint_tuple.get("checkpoint_id"),
+                                "parent_checkpoint_id": checkpoint_tuple.get("parent_checkpoint_id"),
+                                "values": checkpoint_tuple.get("channel_values", {}),
+                                "metadata": checkpoint_tuple.get("metadata", {}),
+                            }
+                    elif hasattr(self.checkpointer, "get"):
+                        return self.checkpointer.get(config_with_id)
+            
             return None
         except Exception as e:
             self._logger.exception("Failed to get latest checkpoint: %s", e)
@@ -66,7 +98,9 @@ class RecoveryEngine:
             return []
         
         try:
-            checkpoints = list(self.checkpointer.list(thread_id, limit=limit))
+            # Use proper configuration format for list API
+            config = {"configurable": {"thread_id": thread_id}}
+            checkpoints = list(self.checkpointer.list(config, limit=limit))
             return checkpoints
         except Exception as e:
             self._logger.exception("Failed to list checkpoints: %s", e)
@@ -88,8 +122,12 @@ class RecoveryEngine:
         
         try:
             # Extract state from checkpoint
-            # LangGraph checkpoints contain state in a specific format
-            state = checkpoint.get("values", {})
+            # LangGraph checkpoints contain state in channel_values or values
+            state = checkpoint.get("values") or checkpoint.get("channel_values", {})
+            if not state:
+                self._logger.warning("Checkpoint found but no state values for thread_id: %s", thread_id)
+                return None
+            
             self._logger.info("Recovered state from checkpoint for thread_id: %s", thread_id)
             return state
         except Exception as e:

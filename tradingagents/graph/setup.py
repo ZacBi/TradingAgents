@@ -64,7 +64,7 @@ class GraphSetup:
         )
         self.graph_builder = GraphBuilder()
         self.edge_connector = EdgeConnector(conditional_logic)
-        self.order_executor = None  # Will be set if trading is enabled
+        self.order_executor = None  # Will be set externally if trading is enabled
 
     def _create_optional_nodes(self):
         """Create valuation, deep_research, expert_team nodes if enabled. Return (valuation, deep, expert)."""
@@ -162,12 +162,14 @@ class GraphSetup:
         self.edge_connector.connect_debate_and_risk(workflow, expert_team_node)
         
         # Phase 3: Connect Order Executor if trading is enabled
-        if self.config.get("trading_enabled", False) and hasattr(self, "order_executor") and self.order_executor:
+        # Note: We need to modify the edge connection in edge_connector
+        # For now, we'll add Order Executor node and edges here
+        if self.config.get("trading_enabled", False) and self.order_executor:
             from langgraph.graph import END
-            # Replace Risk Judge -> END with Risk Judge -> Order Executor -> END
-            # Remove existing edge
-            # Note: LangGraph doesn't have a direct way to remove edges, so we need to rebuild
-            # For now, we'll add the edge before the existing one
+            # Add Order Executor node (already added above)
+            # Modify Risk Judge -> END to Risk Judge -> Order Executor -> END
+            # Since we can't remove edges, we'll add the new path
+            # The edge_connector already added Risk Judge -> END, so we add Order Executor in between
             workflow.add_edge("Risk Judge", "Order Executor")
             workflow.add_edge("Order Executor", END)
 

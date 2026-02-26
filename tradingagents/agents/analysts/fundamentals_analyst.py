@@ -1,59 +1,45 @@
-
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
+from tradingagents.agents.base import BaseAnalyst
 from tradingagents.agents.utils.fundamental_data_tools import (
     get_balance_sheet,
     get_cashflow,
     get_fundamentals,
     get_income_statement,
 )
-from tradingagents.prompts import PromptNames, get_prompt_manager
+from tradingagents.prompts import PromptNames
 
 
-def create_fundamentals_analyst(llm):
-    pm = get_prompt_manager()
-
-    def fundamentals_analyst_node(state):
-        current_date = state["trade_date"]
-        ticker = state["company_of_interest"]
-        state["company_of_interest"]
-
+class FundamentalsAnalyst(BaseAnalyst):
+    """Fundamentals Analyst agent using BaseAnalyst."""
+    
+    def __init__(self, llm):
+        """Initialize Fundamentals Analyst.
+        
+        Args:
+            llm: Language model instance
+        """
         tools = [
             get_fundamentals,
             get_balance_sheet,
             get_cashflow,
             get_income_statement,
         ]
-
-        parts = pm.get_prompt_parts(PromptNames.ANALYST_FUNDAMENTALS)
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    parts["system_template"],
-                ),
-                MessagesPlaceholder(variable_name="messages"),
-            ]
+        super().__init__(
+            llm=llm,
+            tools=tools,
+            prompt_name=PromptNames.ANALYST_FUNDAMENTALS,
+            report_field="fundamentals_report",
+            name="Fundamentals Analyst",
         )
 
-        prompt = prompt.partial(system_message=parts["template"])
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
-        prompt = prompt.partial(current_date=current_date)
-        prompt = prompt.partial(ticker=ticker)
 
-        chain = prompt | llm.bind_tools(tools)
-
-        result = chain.invoke(state["messages"])
-
-        report = ""
-
-        if len(result.tool_calls) == 0:
-            report = result.content
-
-        return {
-            "messages": [result],
-            "fundamentals_report": report,
-        }
-
-    return fundamentals_analyst_node
+def create_fundamentals_analyst(llm):
+    """Factory function to create Fundamentals Analyst.
+    
+    Args:
+        llm: Language model instance
+        
+    Returns:
+        Fundamentals analyst node function
+    """
+    analyst = FundamentalsAnalyst(llm)
+    return analyst.execute
