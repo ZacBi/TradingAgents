@@ -49,6 +49,17 @@
 - 错误恢复机制（ErrorRecovery - 错误分类和重试）
 - 数据流优化（DataAccessor - 缓存机制）
 
+### P2可选功能 ✅
+- **插件机制**（`PluginManager`, `PluginRegistry`）
+  - 支持动态加载Agent插件
+  - 插件发现和注册
+  - 插件生命周期管理
+  
+- **配置驱动流程**（`WorkflowConfig`, `WorkflowBuilder`）
+  - 通过JSON/YAML配置文件定义工作流
+  - 支持所有功能开关和参数配置
+  - 程序化配置支持
+
 ## 🐛 问题修复
 
 ### P0级别（严重问题）- 全部修复 ✅
@@ -131,9 +142,17 @@ from tradingagents.agents.utils.agent_states import create_msg_delete
 
 ## 📚 文档
 
+### 架构文档
 - ✅ 架构设计文档（`docs/arch/10-comprehensive-architecture-redesign-spec.md`）
 - ✅ 实施总结（`docs/arch/12-implementation-summary.md`）
 - ✅ 问题分析（`docs/arch/11-implementation-review-and-issues.md`）
+
+### 使用文档
+- ✅ Long-Run Agent使用指南（`docs/usage/long-run-agent.md`）
+- ✅ 自主交易使用指南（`docs/usage/autonomous-trading.md`）
+- ✅ 插件系统使用指南（`docs/usage/plugins.md`）
+- ✅ 配置驱动流程使用指南（`docs/usage/workflow-config.md`）
+- ✅ 使用文档索引（`docs/usage/README.md`）
 
 ## ✅ 检查清单
 
@@ -141,6 +160,7 @@ from tradingagents.agents.utils.agent_states import create_msg_delete
 - [x] Phase 2: Long-Run Agent实现
 - [x] Phase 3: 交易执行实现
 - [x] Phase 4: 增强功能（P1部分）
+- [x] P2可选功能（插件机制、配置驱动流程）
 - [x] 所有P0问题修复
 - [x] 所有P1问题修复
 - [x] 代码通过linter检查
