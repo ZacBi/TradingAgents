@@ -263,117 +263,148 @@ def resume_from_checkpoint(graph, thread_id):
 
 #### 2.1.2 交易执行接口实现
 
-**目标**：实现交易执行抽象层，支持对接多个券商API
+**目标**：实现交易执行抽象层，支持多种交易类型和策略
+
+**交易类型支持**：
+1. **股票交易**：
+   - 买入（Long）
+   - 卖出（平仓）
+   - 做空（Short Sell）
+   - 平空（Cover Short）
+
+2. **期权交易**：
+   - 买入看涨期权（Buy Call）
+   - 买入看跌期权（Buy Put）
+   - 卖出看涨期权（Sell Call）
+   - 卖出看跌期权（Sell Put）
+
+3. **期权策略**：
+   - Covered Call（备兑看涨）
+   - Protective Put（保护性看跌）
+   - Straddle（跨式）
+   - Strangle（宽跨式）
+   - Iron Condor（铁鹰式）
+   - Butterfly（蝶式）
+   - Calendar Spread（日历价差）
+
+4. **组合订单**：
+   - 多腿订单（Multi-leg Orders）
+   - 价差订单（Spread Orders）
+   - 组合策略订单（Strategy Orders）
+
+**架构设计**：
+
+| 组件 | 职责 | 设计要点 |
+|:----|:----|:--------|
+| **TradingInterface** | 交易接口抽象层 | 定义统一的交易操作接口，支持多种交易类型 |
+| **OrderBuilder** | 订单构建器 | 支持构建简单订单和复杂策略订单 |
+| **StrategyExecutor** | 策略执行器 | 执行期权策略（如Covered Call、Straddle等） |
+| **PositionManager** | 持仓管理器 | 管理股票、期权、组合持仓，计算盈亏 |
+| **RiskController** | 风险控制器 | 针对不同交易类型的风控规则 |
 
 **实施步骤**：
-1. 定义`TradingInterface`抽象基类
-2. 实现Alpaca适配器（优先，API简单）
-3. 实现Interactive Brokers适配器（可选）
-4. 集成到主流程，添加`OrderExecutor`节点
+1. 设计交易接口抽象层，支持股票、期权、组合订单
+2. 实现订单构建器，支持复杂策略订单构建
+3. 实现策略执行器，封装常见期权策略
+4. 实现Alpaca适配器（优先，支持股票和期权）
+5. 实现Interactive Brokers适配器（支持更全面的期权功能）
+6. 集成到主流程，添加`OrderExecutor`节点
 
-**技术方案**：
-```python
-# 抽象接口
-class TradingInterface(ABC):
-    @abstractmethod
-    def place_order(self, ticker, action, quantity, order_type):
-        """下单"""
-        pass
-    
-    @abstractmethod
-    def get_position(self, ticker):
-        """获取持仓"""
-        pass
-    
-    @abstractmethod
-    def cancel_order(self, order_id):
-        """撤单"""
-        pass
-
-# Alpaca实现
-class AlpacaTradingInterface(TradingInterface):
-    def __init__(self, api_key, secret_key, base_url):
-        self.client = TradingClient(api_key, secret_key, base_url=base_url)
-    
-    def place_order(self, ticker, action, quantity, order_type="market"):
-        order_request = MarketOrderRequest(
-            symbol=ticker,
-            qty=quantity,
-            side=OrderSide.BUY if action == "BUY" else OrderSide.SELL
-        )
-        return self.client.submit_order(order_request)
-```
+**技术选型**：
+- **Alpaca**：支持股票和期权，API简单，适合起步
+- **Interactive Brokers**：支持全球市场、更全面的期权功能，适合高级策略
+- **开源工具**：使用Alpaca SDK或ib_async作为底层实现
 
 #### 2.1.3 风险控制执行层
 
-**目标**：在订单执行前进行实时风控检查
+**目标**：在订单执行前进行实时风控检查，支持不同交易类型的风控规则
+
+**风控规则设计**：
+
+| 交易类型 | 风控规则 | 说明 |
+|:--------|:--------|:-----|
+| **股票Long** | 仓位限制、资金充足性、止损止盈 | 标准风控 |
+| **股票Short** | 保证金要求、借券成本、强制平仓线 | 需要额外保证金检查 |
+| **期权Buy** | 权利金限制、时间价值衰减风险 | 期权特有风险 |
+| **期权Sell** | 保证金要求、无限损失风险、希腊字母风险 | 需要更严格的风控 |
+| **组合策略** | 组合保证金、最大损失、盈亏平衡点 | 策略级风控 |
+
+**风控维度**：
+
+1. **仓位管理**：
+   - 单票最大仓位（Long/Short分别限制）
+   - 总仓位上限
+   - 期权仓位限制（按Delta等价）
+   - 组合策略仓位限制
+
+2. **资金管理**：
+   - 单笔最大金额
+   - 日交易限额
+   - 保证金要求（Short和期权Sell）
+   - 可用资金检查
+
+3. **风险度量**：
+   - 最大损失限制（单笔、单日、总持仓）
+   - 希腊字母风险（Delta、Gamma、Theta、Vega）
+   - 波动率风险
+   - 集中度风险
+
+4. **止损止盈**：
+   - 动态止损（股票）
+   - 期权时间价值保护
+   - 组合策略盈亏平衡点
 
 **实施步骤**：
-1. 实现`RiskController`类，包含风控规则
-2. 在`OrderExecutor`节点中集成风控检查
-3. 实现仓位限制、资金管理、止损止盈等规则
-4. 添加风控日志和告警
+1. 设计风险控制器架构，支持不同交易类型的风控规则
+2. 实现基础风控规则（仓位、资金、止损止盈）
+3. 实现期权专用风控（保证金、希腊字母、时间价值）
+4. 实现组合策略风控（组合保证金、最大损失）
+5. 在`OrderExecutor`节点中集成风控检查
+6. 添加风控日志和告警机制
 
-**技术方案**：
-```python
-class RiskController:
-    def __init__(self, config):
-        self.max_position_size = config.get("max_position_size", 0.1)  # 单票最大仓位10%
-        self.max_daily_loss = config.get("max_daily_loss", 0.05)  # 单日最大亏损5%
-        self.stop_loss_pct = config.get("stop_loss_pct", 0.1)  # 止损10%
-    
-    def validate_order(self, decision, current_positions, account_balance):
-        """验证订单是否符合风控规则"""
-        # 1. 仓位限制检查
-        if not self._check_position_limit(decision, current_positions):
-            return False, "Position limit exceeded"
-        
-        # 2. 资金充足性检查
-        if not self._check_sufficient_funds(decision, account_balance):
-            return False, "Insufficient funds"
-        
-        # 3. 止损止盈设置
-        if not self._check_stop_loss(decision, current_positions):
-            return False, "Stop loss check failed"
-        
-        return True, "OK"
-```
+**开源工具集成**：
+- 使用**skfolio**进行风险度量和投资组合优化
+- 使用**pyfolio**进行风险分析
+- 集成期权定价库（如**QuantLib**）计算希腊字母
 
 #### 2.1.4 定时任务调度
 
-**目标**：实现定时自动运行分析任务
+**目标**：实现定时自动运行分析任务和交易执行
+
+**调度任务类型**：
+1. **分析任务**：
+   - 每日市场开盘前分析
+   - 盘中实时分析（可选）
+   - 收盘后复盘分析
+
+2. **交易任务**：
+   - 开盘后执行决策
+   - 盘中监控和调整
+   - 收盘前平仓检查
+
+3. **风控任务**：
+   - 定期持仓检查
+   - 风险指标计算
+   - 止损止盈检查
+
+**调度策略**：
+- 市场时间感知：仅在交易时段执行交易任务
+- 任务依赖管理：分析完成后再执行交易
+- 失败重试机制：指数退避重试
+- 任务优先级：风控任务优先级最高
 
 **实施步骤**：
-1. 集成APScheduler或Celery
-2. 实现定时任务配置
-3. 添加任务状态追踪
-4. 实现任务失败重试机制
+1. 选择调度框架（APScheduler单机或Celery分布式）
+2. 设计任务配置系统（支持多种任务类型）
+3. 实现市场时间感知（交易日历、交易时段）
+4. 实现任务状态追踪和监控
+5. 实现任务失败重试机制
+6. 集成到主系统
 
-**技术方案**：
-```python
-from apscheduler.schedulers.background import BackgroundScheduler
-
-class TradingAgentScheduler:
-    def __init__(self, graph, config):
-        self.graph = graph
-        self.scheduler = BackgroundScheduler()
-        self.config = config
-    
-    def schedule_daily_analysis(self, ticker, hour=9, minute=30):
-        """每天市场开盘后运行分析"""
-        self.scheduler.add_job(
-            self._run_analysis,
-            trigger='cron',
-            hour=hour,
-            minute=minute,
-            args=[ticker],
-            id=f"daily_analysis_{ticker}",
-            replace_existing=True
-        )
-    
-    def start(self):
-        self.scheduler.start()
-```
+**开源工具**：
+- **APScheduler**：轻量级，适合单机部署
+- **Celery**：分布式，适合多机器部署
+- **pandas_market_calendars**：交易日历管理
 
 ### 2.2 中期改进（P1优先级）
 
@@ -648,390 +679,228 @@ graph TB
 
 ### 4.3 实现步骤
 
-#### Step 1: 交易接口抽象层
+#### Step 1: 交易接口抽象层设计
 
-```python
-# tradingagents/trading/interface.py
-from abc import ABC, abstractmethod
+**接口设计原则**：
+- 支持多种交易类型（股票、期权、组合）
+- 统一的订单模型
+- 策略订单支持
+- 持仓管理统一接口
 
-class TradingInterface(ABC):
-    """交易接口抽象基类"""
-    
-    @abstractmethod
-    def place_order(self, ticker: str, action: str, quantity: float, 
-                   order_type: str = "market", limit_price: float = None) -> dict:
-        """下单
-        
-        Args:
-            ticker: 股票代码
-            action: BUY/SELL
-            quantity: 数量
-            order_type: market/limit
-            limit_price: 限价（限价单需要）
-        
-        Returns:
-            {"order_id": str, "status": str, ...}
-        """
-        pass
-    
-    @abstractmethod
-    def get_position(self, ticker: str) -> dict:
-        """获取持仓"""
-        pass
-    
-    @abstractmethod
-    def cancel_order(self, order_id: str) -> bool:
-        """撤单"""
-        pass
-    
-    @abstractmethod
-    def get_order_status(self, order_id: str) -> dict:
-        """获取订单状态"""
-        pass
-    
-    @abstractmethod
-    def get_account_balance(self) -> dict:
-        """获取账户余额"""
-        pass
+**核心接口定义**：
+
+| 接口方法 | 功能 | 支持类型 |
+|:--------|:----|:--------|
+| `place_order()` | 下单 | 股票、期权、组合 |
+| `place_strategy_order()` | 策略订单 | 期权策略（Covered Call等） |
+| `get_position()` | 获取持仓 | 股票、期权、组合 |
+| `get_positions()` | 获取所有持仓 | 全部 |
+| `cancel_order()` | 撤单 | 全部 |
+| `get_order_status()` | 订单状态 | 全部 |
+| `get_account_balance()` | 账户余额 | - |
+| `get_margin_requirement()` | 保证金要求 | Short、期权Sell |
+
+**订单模型设计**：
+
+| 字段 | 说明 | 示例 |
+|:----|:----|:-----|
+| `order_type` | 订单类型 | `STOCK_LONG`, `STOCK_SHORT`, `OPTION_BUY_CALL`, `OPTION_SELL_PUT`, `STRATEGY_COVERED_CALL` |
+| `symbol` | 标的代码 | `AAPL` |
+| `action` | 操作 | `BUY`, `SELL`, `SHORT`, `COVER` |
+| `quantity` | 数量 | `100` |
+| `legs` | 多腿订单 | `[{symbol: "AAPL", action: "BUY", quantity: 100}, ...]` |
+| `strategy_type` | 策略类型 | `COVERED_CALL`, `STRADDLE`, `IRON_CONDOR` |
+| `expiration` | 到期日（期权） | `2026-03-15` |
+| `strike` | 行权价（期权） | `150.0` |
+| `option_type` | 期权类型 | `CALL`, `PUT` |
+
+#### Step 2: 交易接口适配器设计
+
+**适配器架构**：
+
+| 适配器 | 支持功能 | 适用场景 |
+|:------|:--------|:--------|
+| **Alpaca** | 股票、期权（基础）、做空 | 起步阶段，API简单 |
+| **Interactive Brokers** | 股票、期权（全面）、做空、全球市场 | 高级策略，全面功能 |
+| **其他券商** | 根据券商API实现 | 特定需求 |
+
+**Alpaca适配器设计要点**：
+- 支持股票Long/Short
+- 支持期权基础交易（Buy/Sell Call/Put）
+- 支持组合订单（Multi-leg）
+- 支持纸面交易（测试环境）
+
+**Interactive Brokers适配器设计要点**：
+- 支持全面的期权功能
+- 支持复杂期权策略
+- 支持全球市场
+- 需要TWS/Gateway
+
+**实施策略**：
+1. 先实现Alpaca适配器（简单易用）
+2. 再实现IB适配器（功能全面）
+3. 通过抽象层统一接口，便于切换
+4. 支持多券商同时使用（不同账户）
+
+#### Step 3: 风险控制层设计
+
+**风控架构设计**：
+
+| 组件 | 职责 | 设计要点 |
+|:----|:----|:--------|
+| **RiskController** | 主风控控制器 | 统一入口，路由到具体风控规则 |
+| **StockRiskRules** | 股票风控规则 | Long/Short分别处理 |
+| **OptionRiskRules** | 期权风控规则 | 希腊字母、保证金、时间价值 |
+| **StrategyRiskRules** | 策略风控规则 | 组合保证金、最大损失 |
+| **RiskCalculator** | 风险计算器 | 计算风险指标（VaR、CVaR等） |
+
+**风控规则设计**：
+
+1. **股票Long风控**：
+   - 仓位限制（单票、总仓位）
+   - 资金充足性
+   - 止损止盈
+   - 集中度限制
+
+2. **股票Short风控**：
+   - 保证金要求（通常150%）
+   - 借券成本检查
+   - 强制平仓线（维持保证金）
+   - 做空限制（某些股票禁止做空）
+
+3. **期权Buy风控**：
+   - 权利金限制（不超过账户一定比例）
+   - 时间价值衰减风险提醒
+   - 流动性检查（bid-ask spread）
+
+4. **期权Sell风控**：
+   - 保证金要求（更严格）
+   - 无限损失风险警告
+   - 希腊字母风险限制（Delta、Gamma）
+   - 波动率风险（Vega）
+
+5. **组合策略风控**：
+   - 组合保证金计算
+   - 最大损失限制
+   - 盈亏平衡点检查
+   - 策略风险指标
+
+**开源工具集成**：
+- **skfolio**：风险度量和投资组合优化
+- **QuantLib**：期权定价和希腊字母计算
+- **pyfolio**：风险分析
+
+#### Step 4: 订单执行节点设计
+
+**节点功能设计**：
+
+| 功能 | 说明 | 设计要点 |
+|:----|:----|:--------|
+| **决策解析** | 解析Agent决策 | 支持多种决策格式（BUY/SELL/SHORT/OPTION/STRATEGY） |
+| **订单构建** | 构建订单对象 | 支持简单订单和复杂策略订单 |
+| **风控检查** | 执行前风控 | 调用RiskController进行验证 |
+| **订单执行** | 执行订单 | 调用TradingInterface下单 |
+| **结果记录** | 记录交易结果 | 更新数据库、持仓、订单状态 |
+| **错误处理** | 异常处理 | 记录错误、触发告警、支持重试 |
+
+**决策到订单的映射**：
+
+| Agent决策 | 交易类型 | 订单构建 |
+|:---------|:--------|:--------|
+| `BUY` | 股票Long | 构建买入订单 |
+| `SELL` | 股票平仓 | 构建卖出订单 |
+| `SHORT` | 股票做空 | 构建做空订单 |
+| `COVER` | 股票平空 | 构建平空订单 |
+| `BUY_CALL` | 期权买入看涨 | 构建期权买入订单 |
+| `SELL_PUT` | 期权卖出看跌 | 构建期权卖出订单 |
+| `COVERED_CALL` | 备兑看涨策略 | 构建组合订单（股票+期权） |
+| `STRADDLE` | 跨式策略 | 构建组合订单（Call+Put） |
+
+**实施要点**：
+1. 决策解析器：支持多种决策格式
+2. 订单构建器：支持简单和复杂订单
+3. 策略执行器：封装常见期权策略
+4. 错误处理：完善的异常处理和重试机制
+5. 状态更新：实时更新持仓、订单状态
+
+#### Step 5: 集成到主流程设计
+
+**流程集成设计**：
+
+```
+现有流程：
+Analyst → Researcher → Trader → Risk Judge → END
+
+集成后流程：
+Analyst → Researcher → Trader → Risk Judge → Order Executor → END
+                                              ↓
+                                         (可选) Strategy Builder
+                                              ↓
+                                         (可选) Position Manager
 ```
 
-#### Step 2: Alpaca适配器实现
+**集成要点**：
+1. **条件集成**：通过`trading_enabled`配置控制是否启用
+2. **节点顺序**：Order Executor在Risk Judge之后
+3. **状态传递**：将决策、持仓、账户信息传递给Order Executor
+4. **结果反馈**：将执行结果反馈到状态，供后续节点使用
 
-```python
-# tradingagents/trading/adapters/alpaca.py
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
-from tradingagents.trading.interface import TradingInterface
+**配置设计**：
+- `trading_enabled`: 是否启用交易执行
+- `trading_provider`: 交易接口提供商（alpaca/ib）
+- `trading_types`: 支持的交易类型（stock/option/strategy）
+- `auto_execute`: 是否自动执行（False时仅记录决策）
 
-class AlpacaTradingInterface(TradingInterface):
-    """Alpaca交易接口实现"""
-    
-    def __init__(self, api_key: str, secret_key: str, base_url: str = None):
-        self.client = TradingClient(
-            api_key=api_key,
-            secret_key=secret_key,
-            base_url=base_url or "https://paper-api.alpaca.markets"  # 默认纸面交易
-        )
-    
-    def place_order(self, ticker: str, action: str, quantity: float,
-                   order_type: str = "market", limit_price: float = None) -> dict:
-        """下单"""
-        side = OrderSide.BUY if action == "BUY" else OrderSide.SELL
-        
-        if order_type == "market":
-            order_request = MarketOrderRequest(
-                symbol=ticker,
-                qty=quantity,
-                side=side,
-                time_in_force=TimeInForce.DAY
-            )
-        elif order_type == "limit":
-            order_request = LimitOrderRequest(
-                symbol=ticker,
-                qty=quantity,
-                side=side,
-                limit_price=limit_price,
-                time_in_force=TimeInForce.DAY
-            )
-        else:
-            raise ValueError(f"Unsupported order_type: {order_type}")
-        
-        order = self.client.submit_order(order_request)
-        return {
-            "order_id": str(order.id),
-            "status": order.status.value,
-            "filled_qty": float(order.filled_qty) if order.filled_qty else 0,
-            "filled_avg_price": float(order.filled_avg_price) if order.filled_avg_price else None,
-        }
-    
-    def get_position(self, ticker: str) -> dict:
-        """获取持仓"""
-        position = self.client.get_open_position(ticker)
-        if position:
-            return {
-                "ticker": position.symbol,
-                "quantity": float(position.qty),
-                "avg_cost": float(position.avg_entry_price),
-                "current_price": float(position.current_price),
-                "unrealized_pnl": float(position.unrealized_pl),
-            }
-        return None
-    
-    def cancel_order(self, order_id: str) -> bool:
-        """撤单"""
-        self.client.cancel_order_by_id(order_id)
-        return True
-    
-    def get_order_status(self, order_id: str) -> dict:
-        """获取订单状态"""
-        order = self.client.get_order_by_id(order_id)
-        return {
-            "order_id": str(order.id),
-            "status": order.status.value,
-            "filled_qty": float(order.filled_qty) if order.filled_qty else 0,
-            "filled_avg_price": float(order.filled_avg_price) if order.filled_avg_price else None,
-        }
-    
-    def get_account_balance(self) -> dict:
-        """获取账户余额"""
-        account = self.client.get_account()
-        return {
-            "cash": float(account.cash),
-            "buying_power": float(account.buying_power),
-            "portfolio_value": float(account.portfolio_value),
-            "equity": float(account.equity),
-        }
-```
+### 4.4 风险控制机制设计
 
-#### Step 3: 风险控制层
-
-```python
-# tradingagents/trading/risk_controller.py
-class RiskController:
-    """风险控制器"""
-    
-    def __init__(self, config: dict):
-        self.max_position_size = config.get("max_position_size", 0.1)  # 单票最大仓位10%
-        self.max_total_position = config.get("max_total_position", 0.8)  # 总仓位上限80%
-        self.max_daily_loss = config.get("max_daily_loss", 0.05)  # 单日最大亏损5%
-        self.stop_loss_pct = config.get("stop_loss_pct", 0.1)  # 止损10%
-        self.take_profit_pct = config.get("take_profit_pct", 0.2)  # 止盈20%
-        self.max_order_value = config.get("max_order_value", 10000)  # 单笔最大金额
-    
-    def validate_order(self, decision: dict, current_positions: list, 
-                       account_balance: dict) -> tuple[bool, str]:
-        """验证订单是否符合风控规则
-        
-        Returns:
-            (is_valid, reason)
-        """
-        ticker = decision.get("ticker")
-        action = decision.get("final_decision")  # BUY/SELL/HOLD
-        quantity = decision.get("quantity", 0)
-        price = decision.get("price", 0)
-        
-        if action == "HOLD":
-            return True, "HOLD decision, no order needed"
-        
-        # 1. 仓位限制检查
-        if not self._check_position_limit(ticker, action, quantity, current_positions):
-            return False, "Position limit exceeded"
-        
-        # 2. 资金充足性检查
-        if action == "BUY":
-            order_value = quantity * price
-            if order_value > account_balance.get("buying_power", 0):
-                return False, "Insufficient buying power"
-            if order_value > self.max_order_value:
-                return False, f"Order value {order_value} exceeds max {self.max_order_value}"
-        
-        # 3. 总仓位检查
-        if not self._check_total_position(current_positions, account_balance):
-            return False, "Total position limit exceeded"
-        
-        # 4. 单日亏损检查
-        if not self._check_daily_loss(account_balance):
-            return False, "Daily loss limit exceeded"
-        
-        return True, "OK"
-    
-    def _check_position_limit(self, ticker: str, action: str, quantity: float,
-                              current_positions: list) -> bool:
-        """检查单票仓位限制"""
-        current_pos = next((p for p in current_positions if p["ticker"] == ticker), None)
-        current_qty = current_pos["quantity"] if current_pos else 0
-        
-        if action == "BUY":
-            new_qty = current_qty + quantity
-        else:  # SELL
-            new_qty = current_qty - quantity
-        
-        # 计算新仓位占比（需要账户总价值，这里简化处理）
-        # 实际应该基于账户总价值计算
-        return True  # 简化实现
-    
-    def _check_total_position(self, current_positions: list, account_balance: dict) -> bool:
-        """检查总仓位限制"""
-        total_position_value = sum(
-            p.get("quantity", 0) * p.get("current_price", 0) 
-            for p in current_positions
-        )
-        portfolio_value = account_balance.get("portfolio_value", 1)
-        position_ratio = total_position_value / portfolio_value if portfolio_value > 0 else 0
-        return position_ratio <= self.max_total_position
-    
-    def _check_daily_loss(self, account_balance: dict) -> bool:
-        """检查单日亏损限制"""
-        # 需要从数据库获取当日初始净值
-        # 这里简化处理
-        return True
-```
-
-#### Step 4: 订单执行节点
-
-```python
-# tradingagents/graph/nodes/order_executor.py
-def create_order_executor_node(trading_interface: TradingInterface,
-                               risk_controller: RiskController,
-                               db: DatabaseManager):
-    """创建订单执行节点"""
-    
-    def order_executor_node(state: dict):
-        """订单执行节点"""
-        decision = state.get("final_trade_decision")
-        ticker = state.get("company_of_interest")
-        
-        # 提取决策信号
-        signal = state.get("final_trade_decision", "").upper()
-        if "HOLD" in signal or signal == "":
-            return {
-                "order_result": {
-                    "status": "skipped",
-                    "reason": "HOLD decision"
-                }
-            }
-        
-        # 确定交易方向
-        action = "BUY" if "BUY" in signal else "SELL"
-        
-        # 获取当前持仓和账户余额
-        current_positions = trading_interface.get_all_positions()
-        account_balance = trading_interface.get_account_balance()
-        
-        # 计算订单数量（简化：基于固定金额或百分比）
-        # 实际应该从决策中提取或计算
-        quantity = calculate_order_quantity(
-            decision, account_balance, current_positions
-        )
-        
-        # 风控检查
-        is_valid, reason = risk_controller.validate_order(
-            {
-                "ticker": ticker,
-                "final_decision": action,
-                "quantity": quantity,
-                "price": get_current_price(ticker),  # 需要实现
-            },
-            current_positions,
-            account_balance
-        )
-        
-        if not is_valid:
-            logger.warning(f"Order rejected by risk controller: {reason}")
-            return {
-                "order_result": {
-                    "status": "rejected",
-                    "reason": reason
-                }
-            }
-        
-        # 执行订单
-        try:
-            order_result = trading_interface.place_order(
-                ticker=ticker,
-                action=action,
-                quantity=quantity,
-                order_type="market"
-            )
-            
-            # 记录交易
-            trade_id = db.record_trade({
-                "ticker": ticker,
-                "action": action,
-                "quantity": quantity,
-                "price": order_result.get("filled_avg_price", 0),
-                "decision_id": state.get("decision_id"),  # 需要从state中获取
-            })
-            
-            # 更新持仓
-            update_positions(ticker, action, quantity, order_result)
-            
-            logger.info(f"Order executed: {ticker} {action} {quantity} @ {order_result.get('filled_avg_price')}")
-            
-            return {
-                "order_result": {
-                    "status": "executed",
-                    "order_id": order_result.get("order_id"),
-                    "trade_id": trade_id,
-                    "quantity": quantity,
-                    "price": order_result.get("filled_avg_price"),
-                }
-            }
-        except Exception as e:
-            logger.error(f"Order execution failed: {e}", exc_info=True)
-            return {
-                "order_result": {
-                    "status": "failed",
-                    "error": str(e)
-                }
-            }
-    
-    return order_executor_node
-```
-
-#### Step 5: 集成到主流程
-
-```python
-# tradingagents/graph/setup.py
-def setup_graph(self, selected_analysts, ...):
-    """设置图，添加订单执行节点"""
-    workflow = StateGraph(AgentState)
-    
-    # ... 现有节点 ...
-    
-    # 添加订单执行节点
-    if self.config.get("trading_enabled", False):
-        order_executor = create_order_executor_node(
-            trading_interface=self.trading_interface,
-            risk_controller=self.risk_controller,
-            db=self.db
-        )
-        workflow.add_node("Order Executor", order_executor)
-        workflow.add_edge("Risk Judge", "Order Executor")
-        workflow.add_edge("Order Executor", END)
-    else:
-        workflow.add_edge("Risk Judge", END)
-    
-    return workflow.compile(checkpointer=self.checkpointer)
-```
-
-### 4.4 风险控制机制
-
-| 风控规则 | 实现位置 | 优先级 | 说明 |
+| 风控规则 | 适用交易类型 | 优先级 | 说明 |
 |:----|:----|:------|:-----|
-| **仓位限制** | `RiskController._check_position_limit` | P0 | 单票最大仓位、总仓位上限 |
-| **资金管理** | `RiskController.validate_order` | P0 | 单笔最大金额、日交易限额 |
-| **止损止盈** | `RiskController` | P0 | 动态止损、移动止盈 |
-| **市场时间** | `OrderExecutor` | P1 | 仅交易时段下单 |
-| **异常检测** | `OrderExecutor` | P1 | 异常波动暂停交易 |
-| **订单超时** | `OrderManager` | P1 | 订单超时自动撤单 |
+| **仓位限制** | 全部 | P0 | 单票最大仓位、总仓位上限、期权Delta等价 |
+| **资金管理** | 全部 | P0 | 单笔最大金额、日交易限额、保证金要求 |
+| **止损止盈** | 股票 | P0 | 动态止损、移动止盈 |
+| **期权时间价值** | 期权Buy | P0 | 时间价值衰减风险提醒 |
+| **期权保证金** | 期权Sell | P0 | 保证金要求、无限损失风险 |
+| **组合策略风险** | 策略 | P0 | 组合保证金、最大损失、盈亏平衡点 |
+| **希腊字母风险** | 期权 | P1 | Delta、Gamma、Theta、Vega限制 |
+| **市场时间** | 全部 | P1 | 仅交易时段下单 |
+| **异常检测** | 全部 | P1 | 异常波动暂停交易 |
+| **订单超时** | 全部 | P1 | 订单超时自动撤单 |
+| **集中度风险** | 全部 | P1 | 行业、板块集中度限制 |
 
-### 4.5 配置示例
+### 4.5 配置设计
 
-```python
-# config/trading_config.py
-TRADING_CONFIG = {
-    # 交易接口配置
-    "trading_enabled": True,
-    "trading_provider": "alpaca",  # alpaca / ib
-    "alpaca_api_key": os.getenv("ALPACA_API_KEY"),
-    "alpaca_secret_key": os.getenv("ALPACA_SECRET_KEY"),
-    "alpaca_base_url": "https://paper-api.alpaca.markets",  # 纸面交易
-    
-    # 风控配置
-    "max_position_size": 0.1,  # 单票最大仓位10%
-    "max_total_position": 0.8,  # 总仓位上限80%
-    "max_daily_loss": 0.05,  # 单日最大亏损5%
-    "stop_loss_pct": 0.1,  # 止损10%
-    "take_profit_pct": 0.2,  # 止盈20%
-    "max_order_value": 10000,  # 单笔最大金额
-    
-    # 订单配置
-    "default_order_type": "market",  # market / limit
-    "order_timeout_seconds": 300,  # 订单超时时间
-}
-```
+**配置结构设计**：
+
+| 配置项 | 说明 | 默认值 |
+|:------|:----|:------|
+| **交易接口** | | |
+| `trading_enabled` | 是否启用交易执行 | `False` |
+| `trading_provider` | 交易接口提供商 | `alpaca` |
+| `trading_types` | 支持的交易类型 | `["stock"]` |
+| `paper_trading` | 是否纸面交易 | `True` |
+| **股票交易** | | |
+| `allow_short` | 允许做空 | `False` |
+| `short_margin_requirement` | 做空保证金要求 | `1.5` |
+| **期权交易** | | |
+| `allow_options` | 允许期权交易 | `False` |
+| `option_premium_limit` | 期权权利金限制（账户比例） | `0.1` |
+| `option_margin_requirement` | 期权保证金要求 | `根据策略` |
+| **策略交易** | | |
+| `allow_strategies` | 允许策略交易 | `False` |
+| `supported_strategies` | 支持的策略列表 | `[]` |
+| **风控配置** | | |
+| `max_position_size` | 单票最大仓位 | `0.1` |
+| `max_total_position` | 总仓位上限 | `0.8` |
+| `max_daily_loss` | 单日最大亏损 | `0.05` |
+| `stop_loss_pct` | 止损比例 | `0.1` |
+| `take_profit_pct` | 止盈比例 | `0.2` |
+| `max_order_value` | 单笔最大金额 | `10000` |
+| `max_option_delta` | 期权最大Delta | `100` |
+| `max_option_gamma` | 期权最大Gamma | `50` |
+| **订单配置** | | |
+| `default_order_type` | 默认订单类型 | `market` |
+| `order_timeout_seconds` | 订单超时时间 | `300` |
+| `retry_failed_orders` | 失败订单重试 | `False` |
 
 ## 5. 实施路线图
 
