@@ -36,5 +36,20 @@ def get_stock(
     }
 
     response = _make_api_request("TIME_SERIES_DAILY_ADJUSTED", params)
-
-    return _filter_csv_by_date_range(response, start_date, end_date)
+    filtered_response = _filter_csv_by_date_range(response, start_date, end_date)
+    
+    # Lineage: record raw market data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_market_data
+        # Convert CSV string to dict for storage (simplified)
+        try_record_raw_market_data(
+            ticker=symbol,
+            trade_date=end_date,
+            price_data=filtered_response[:1000] if len(filtered_response) > 1000 else filtered_response,  # Limit size
+            indicators=None,
+            source="alpha_vantage",
+        )
+    except Exception:
+        pass
+    
+    return filtered_response

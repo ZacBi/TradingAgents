@@ -47,6 +47,7 @@ from tradingagents.config import DEFAULT_CONFIG, set_config
 from tradingagents.llm_clients import create_llm_client
 
 from .conditional_logic import ConditionalLogic
+from .error_recovery import ErrorRecovery
 from .propagation import Propagator
 from .recovery import RecoveryEngine
 from .reflection import Reflector
@@ -182,6 +183,9 @@ class TradingAgentsGraph:
         self.propagator = Propagator()
         self.reflector = Reflector(self.quick_thinking_llm)
         self.signal_processor = SignalProcessor(self.quick_thinking_llm)
+        
+        # Phase 4: Error recovery
+        self.error_recovery = ErrorRecovery(self.config.get("error_recovery_config", {}))
 
         # State tracking
         self.curr_state = None
@@ -505,20 +509,34 @@ class TradingAgentsGraph:
 
         args = self.propagator.get_graph_args(thread_id=thread_id)
 
+        # Phase 4: Execute with error recovery
         if self.debug:
             # Debug mode with tracing
             trace = []
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
-                    pass
-                else:
-                    chunk["messages"][-1].pretty_print()
-                    trace.append(chunk)
-
-            final_state = trace[-1]
+            def stream_graph():
+                for chunk in self.graph.stream(init_agent_state, **args):
+                    if len(chunk["messages"]) == 0:
+                        pass
+                    else:
+                        chunk["messages"][-1].pretty_print()
+                        trace.append(chunk)
+                return trace[-1] if trace else init_agent_state
+            
+            final_state, error = self.error_recovery.execute_with_retry(stream_graph)
+            if error:
+                logger.error("Graph execution failed after retries: %s", error)
+                # Return partial state if available
+                final_state = trace[-1] if trace else init_agent_state
         else:
             # Standard mode without tracing
-            final_state = self.graph.invoke(init_agent_state, **args)
+            def invoke_graph():
+                return self.graph.invoke(init_agent_state, **args)
+            
+            final_state, error = self.error_recovery.execute_with_retry(invoke_graph)
+            if error:
+                logger.error("Graph execution failed after retries: %s", error)
+                # Return initial state as fallback
+                final_state = init_agent_state
 
         # Store current state for reflection
         self.curr_state = final_state
