@@ -36,3 +36,5 @@ TradingAgents is a multi-agent LLM-powered financial trading framework. It uses 
 - The `tests/` directory only has tests under `tests/valuation/`. No test files exist in the root `tests/` directory.
 - Default database is SQLite (no external DB needed). PostgreSQL is optional via `--extra postgres` and `docker-compose.yml`.
 - `redis` is listed as a dependency but has zero usage in the codebase.
+- The default models in `DEFAULT_CONFIG` are `gpt-5.2` / `gpt-5-mini`. Override with `config['deep_think_llm'] = 'gpt-4o-mini'` etc. if those models are unavailable on your OpenAI plan.
+- To run `propagate()` cheaply for testing, disable optional features: `experts_enabled=False`, `valuation_enabled=False`, `store_enabled=False`, `deep_research_enabled=False`, and set `max_debate_rounds=1`.
