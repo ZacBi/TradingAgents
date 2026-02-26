@@ -33,6 +33,7 @@ class NodeFactory:
         self.tool_nodes = tool_nodes
         self._analyst_creators = {}
         self._core_creators = {}
+        self._plugin_manager = None  # Will be set if plugins are enabled
         self._register_default_creators()
     
     def _register_default_creators(self):
@@ -82,6 +83,26 @@ class NodeFactory:
         """
         self._analyst_creators[key] = (creator, tool_key)
         logger.info(f"Registered analyst: {key}")
+    
+    def set_plugin_manager(self, plugin_manager):
+        """Set plugin manager for dynamic plugin loading.
+        
+        Args:
+            plugin_manager: PluginManager instance
+        """
+        self._plugin_manager = plugin_manager
+        # Load plugins and register them
+        if plugin_manager:
+            plugin_manager.discover_and_load_plugins()
+            # Register plugin-based analysts
+            for plugin_info in plugin_manager.list_available_plugins("analyst"):
+                plugin_id = plugin_info["plugin_id"]
+                instance = plugin_manager.create_plugin_instance(plugin_id)
+                if instance and hasattr(instance, "create_analyst"):
+                    # Assume plugin provides create_analyst method
+                    creator = instance.create_analyst
+                    tool_key = plugin_info.get("tool_key", plugin_id)
+                    self.register_analyst(plugin_id, creator, tool_key)
     
     def create_analyst_nodes(self, selected_analysts: list) -> tuple[dict, dict]:
         """Create analyst nodes for selected analysts.

@@ -210,6 +210,25 @@ class TradingAgentsGraph:
         if self.order_executor:
             self.graph_setup.order_executor = self.order_executor
 
+        # Phase 4: Apply workflow configuration if provided
+        if self.config.get("workflow_config_file"):
+            from tradingagents.config.workflow_config import WorkflowConfig, WorkflowBuilder
+            workflow_config = WorkflowConfig.from_file(self.config["workflow_config_file"])
+            workflow_builder = WorkflowBuilder(workflow_config)
+            workflow_builder.apply_to_graph_setup(self.graph_setup)
+            # Use configured analysts
+            selected_analysts = workflow_config.get_analysts()
+        
+        # Phase 4: Load plugins if enabled
+        if self.config.get("plugins_enabled", False):
+            from tradingagents.plugins import PluginManager
+            plugin_dirs = self.config.get("plugin_dirs", [])
+            plugin_manager = PluginManager(plugin_dirs=plugin_dirs)
+            plugin_manager.discover_and_load_plugins()
+            # Register plugins with node factory
+            if hasattr(self.graph_setup, "node_factory"):
+                self.graph_setup.node_factory.set_plugin_manager(plugin_manager)
+        
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
 
