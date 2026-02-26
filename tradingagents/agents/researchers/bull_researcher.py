@@ -1,50 +1,55 @@
+from tradingagents.agents.base import BaseResearcher
+from tradingagents.graph.state_manager import StateManager
+from tradingagents.prompts import PromptNames
 
-from tradingagents.prompts import PromptNames, get_prompt_manager
+
+class BullResearcher(BaseResearcher):
+    """Bull Researcher agent using BaseResearcher."""
+    
+    def __init__(self, llm, memory):
+        """Initialize Bull Researcher.
+        
+        Args:
+            llm: Language model instance
+            memory: Memory instance for semantic retrieval
+        """
+        super().__init__(
+            llm=llm,
+            memory=memory,
+            prompt_name=PromptNames.RESEARCHER_BULL,
+            prefix="Bull Analyst",
+            name="Bull Researcher",
+        )
+        self.state_manager = StateManager()
+    
+    def analyze(self, state):
+        """Execute bull researcher analysis.
+        
+        Args:
+            state: Current agent state
+            
+        Returns:
+            Dictionary with argument
+        """
+        # Use base class analyze to get argument
+        result = super().analyze(state)
+        argument = result["argument"]
+        agent_type = result["agent_type"]
+        
+        # Use StateManager to update state
+        state_update = self.state_manager.update_debate_state(state, agent_type, argument)
+        return state_update
 
 
 def create_bull_researcher(llm, memory):
-    pm = get_prompt_manager()
-
-    def bull_node(state) -> dict:
-        investment_debate_state = state["investment_debate_state"]
-        history = investment_debate_state.get("history", "")
-        bull_history = investment_debate_state.get("bull_history", "")
-
-        current_response = investment_debate_state.get("current_response", "")
-        market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
-        news_report = state["news_report"]
-        fundamentals_report = state["fundamentals_report"]
-
-        curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
-        past_memories = memory.get_memories(curr_situation, n_matches=2)
-
-        past_memory_str = ""
-        for _i, rec in enumerate(past_memories, 1):
-            past_memory_str += rec["recommendation"] + "\n\n"
-
-        prompt = pm.get_prompt(PromptNames.RESEARCHER_BULL, variables={
-            "market_research_report": market_research_report,
-            "sentiment_report": sentiment_report,
-            "news_report": news_report,
-            "fundamentals_report": fundamentals_report,
-            "history": history,
-            "current_response": current_response,
-            "past_memory_str": past_memory_str,
-        })
-
-        response = llm.invoke(prompt)
-
-        argument = f"Bull Analyst: {response.content}"
-
-        new_investment_debate_state = {
-            "history": history + "\n" + argument,
-            "bull_history": bull_history + "\n" + argument,
-            "bear_history": investment_debate_state.get("bear_history", ""),
-            "current_response": argument,
-            "count": investment_debate_state["count"] + 1,
-        }
-
-        return {"investment_debate_state": new_investment_debate_state}
-
-    return bull_node
+    """Factory function to create Bull Researcher.
+    
+    Args:
+        llm: Language model instance
+        memory: Memory instance
+        
+    Returns:
+        Bull researcher node function
+    """
+    researcher = BullResearcher(llm, memory)
+    return researcher.execute

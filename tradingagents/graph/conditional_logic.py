@@ -7,6 +7,10 @@ from tradingagents.agents.utils.agent_states import AgentState
 logger = logging.getLogger(__name__)
 
 
+from .condition_evaluator import ConditionEvaluator
+from .route_resolver import RouteResolver
+
+
 class ConditionalLogic:
     """Handles conditional logic for determining graph flow."""
 
@@ -27,6 +31,13 @@ class ConditionalLogic:
         self.max_debate_rounds = max_debate_rounds
         self.max_risk_discuss_rounds = max_risk_discuss_rounds
         self._config = config or {}
+        
+        # Initialize condition evaluator and route resolver
+        config_for_evaluator = self._config.copy()
+        config_for_evaluator["max_debate_rounds"] = max_debate_rounds
+        config_for_evaluator["max_risk_rounds"] = max_risk_discuss_rounds
+        self.condition_evaluator = ConditionEvaluator(config_for_evaluator)
+        self.route_resolver = RouteResolver(self.condition_evaluator)
 
         # Phase 3: Initialize convergence detector if enabled
         self._convergence_detector = None
@@ -74,11 +85,10 @@ class ConditionalLogic:
         """
         Determine if debate should continue.
 
-        Uses convergence detection if enabled, otherwise falls back
-        to round-based limit.
+        Uses convergence detection if enabled, otherwise uses RouteResolver.
         """
         debate_state = state["investment_debate_state"]
-        current_count = debate_state["count"]
+        current_count = debate_state.get("count", 0)
 
         # Phase 3: Check semantic convergence if enabled
         if self._convergence_detector is not None:
@@ -94,27 +104,27 @@ class ConditionalLogic:
                 logger.info("Debate stopping: reason=%s, rounds=%d", reason, current_count // 2)
                 return self._after_debate_target(state)
 
-        # Fallback: Round-based limit
-        if current_count >= 2 * self.max_debate_rounds:
-            return self._after_debate_target(state)
-
-        # Alternate between Bull and Bear
-        if debate_state["current_response"].startswith("Bull"):
-            return "Bear Researcher"
-        return "Bull Researcher"
+        # Use RouteResolver for routing decision
+        expert_enabled = self._config.get("experts_enabled", False)
+        return self.route_resolver.resolve_debate_route(state, expert_enabled)
 
     def should_continue_risk_analysis(self, state: AgentState) -> str:
-        """Determine if risk analysis should continue."""
+        """Determine if risk analysis should continue.
+        
+        Uses RouteResolver for routing decision.
+        """
         risk_state = state["risk_debate_state"]
-
-        if risk_state["count"] >= 3 * self.max_risk_discuss_rounds:
-            return "Risk Judge"
-
-        if risk_state["latest_speaker"].startswith("Aggressive"):
-            return "Conservative Analyst"
-        if risk_state["latest_speaker"].startswith("Conservative"):
-            return "Neutral Analyst"
-        return "Aggressive Analyst"
+        current_speaker = risk_state.get("latest_speaker", "Aggressive")
+        
+        # Map speaker to node name
+        node_map = {
+            "Aggressive": "Aggressive Analyst",
+            "Conservative": "Conservative Analyst",
+            "Neutral": "Neutral Analyst",
+        }
+        current_node = node_map.get(current_speaker.split()[0], "Aggressive Analyst")
+        
+        return self.route_resolver.resolve_risk_route(state, current_node)
 
     def _after_debate_target(self, state: AgentState) -> str:
         """After debate ends, route to Experts (if enabled) or Research Manager."""
@@ -143,16 +153,11 @@ class ConditionalLogic:
         Determine if deep research should run.
 
         Called after analysts complete to decide if deep research is needed.
+        Uses RouteResolver for routing decision.
         """
-        if not self._config.get("deep_research_enabled", False):
-            return "Bull Researcher"
-
         # Check if deep research already completed
         if state.get("deep_research_report"):
             return "Bull Researcher"
 
-        # Could add more sophisticated trigger logic here
-        if self._config.get("force_deep_research", False):
-            return "Deep Research"
-
-        return "Bull Researcher"
+        # Use RouteResolver for routing decision
+        return self.route_resolver.resolve_deep_research_route(state)

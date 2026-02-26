@@ -35,18 +35,10 @@ def create_research_manager(llm, memory):
             logger.exception("Research Manager LLM invoke failed")
             content = f"Error during research synthesis; defaulting to HOLD. Reason: {e}"
 
-        new_investment_debate_state = {
-            "judge_decision": content,
-            "history": investment_debate_state.get("history", ""),
-            "bear_history": investment_debate_state.get("bear_history", ""),
-            "bull_history": investment_debate_state.get("bull_history", ""),
-            "current_response": content,
-            "count": investment_debate_state["count"],
-        }
-
-        return {
-            "investment_debate_state": new_investment_debate_state,
-            "investment_plan": content,
-        }
+        # Use StateManager to update state
+        from tradingagents.graph.state_manager import StateManager
+        state_manager = StateManager()
+        state_update = state_manager.update_research_manager_decision(state, content)
+        return state_update
 
     return research_manager_node

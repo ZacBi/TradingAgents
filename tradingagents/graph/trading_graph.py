@@ -8,26 +8,34 @@ from typing import Any
 
 from langgraph.prebuilt import ToolNode
 
-# Import the new abstract tool methods from agent_utils
-from tradingagents.agents.utils.agent_utils import (
+# Import tool methods directly from their modules
+from tradingagents.agents.utils.core_stock_tools import get_stock_data
+from tradingagents.agents.utils.fundamental_data_tools import (
     get_balance_sheet,
     get_cashflow,
-    get_cpi_data,
-    get_earnings_dates,
     get_fundamentals,
-    get_gdp_data,
-    get_global_news,
     get_income_statement,
-    get_indicators,
-    get_insider_transactions,
-    get_institutional_holders,
+)
+from tradingagents.agents.utils.macro_data_tools import (
+    get_cpi_data,
+    get_gdp_data,
     get_interest_rate_data,
-    get_kline_data,
     get_m2_data,
-    get_news,
-    get_realtime_quote,
-    get_stock_data,
     get_unemployment_data,
+)
+from tradingagents.agents.utils.news_data_tools import (
+    get_global_news,
+    get_insider_transactions,
+    get_news,
+)
+from tradingagents.agents.utils.realtime_data_tools import (
+    get_kline_data,
+    get_realtime_quote,
+)
+from tradingagents.agents.utils.technical_indicators_tools import get_indicators
+from tradingagents.agents.utils.valuation_data_tools import (
+    get_earnings_dates,
+    get_institutional_holders,
     get_valuation_metrics,
 )
 from tradingagents.agents.utils.memory import (
@@ -39,7 +47,9 @@ from tradingagents.config import DEFAULT_CONFIG, set_config
 from tradingagents.llm_clients import create_llm_client
 
 from .conditional_logic import ConditionalLogic
+from .error_recovery import ErrorRecovery
 from .propagation import Propagator
+from .recovery import RecoveryEngine
 from .reflection import Reflector
 from .setup import GraphSetup
 from .signal_processing import SignalProcessor
@@ -143,8 +153,11 @@ class TradingAgentsGraph:
 
         # --- Phase 0: LangGraph Checkpointing (before GraphSetup) ---
         self.checkpointer = None
+        self.recovery_engine = None
         if self.config.get("checkpointing_enabled"):
             self._init_checkpointer()
+            if self.checkpointer:
+                self.recovery_engine = RecoveryEngine(self.checkpointer)
 
         # Initialize components
         self.conditional_logic = ConditionalLogic(
@@ -170,6 +183,9 @@ class TradingAgentsGraph:
         self.propagator = Propagator()
         self.reflector = Reflector(self.quick_thinking_llm)
         self.signal_processor = SignalProcessor(self.quick_thinking_llm)
+        
+        # Phase 4: Error recovery
+        self.error_recovery = ErrorRecovery(self.config.get("error_recovery_config", {}))
 
         # State tracking
         self.curr_state = None
@@ -180,7 +196,39 @@ class TradingAgentsGraph:
         self.db = None
         if self.config.get("database_enabled"):
             self._init_database()
+        
+        # --- Phase 3: Trading Interface ---
+        self.trading_interface = None
+        self.risk_controller = None
+        self.order_executor = None
+        self.order_manager = None
+        self.position_manager = None
+        if self.config.get("trading_enabled", False):
+            self._init_trading()
+        
+        # Pass order_executor to graph_setup BEFORE setting up graph
+        if self.order_executor:
+            self.graph_setup.order_executor = self.order_executor
 
+        # Phase 4: Apply workflow configuration if provided
+        if self.config.get("workflow_config_file"):
+            from tradingagents.config.workflow_config import WorkflowConfig, WorkflowBuilder
+            workflow_config = WorkflowConfig.from_file(self.config["workflow_config_file"])
+            workflow_builder = WorkflowBuilder(workflow_config)
+            workflow_builder.apply_to_graph_setup(self.graph_setup)
+            # Use configured analysts
+            selected_analysts = workflow_config.get_analysts()
+        
+        # Phase 4: Load plugins if enabled
+        if self.config.get("plugins_enabled", False):
+            from tradingagents.plugins import PluginManager
+            plugin_dirs = self.config.get("plugin_dirs", [])
+            plugin_manager = PluginManager(plugin_dirs=plugin_dirs)
+            plugin_manager.discover_and_load_plugins()
+            # Register plugins with node factory
+            if hasattr(self.graph_setup, "node_factory"):
+                self.graph_setup.node_factory.set_plugin_manager(plugin_manager)
+        
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
 
@@ -256,7 +304,13 @@ class TradingAgentsGraph:
             self.embedder = None
 
     def _init_checkpointer(self):
-        """Initialize LangGraph checkpointer based on config."""
+        """Initialize LangGraph checkpointer based on config.
+        
+        Follows LangGraph best practices (2025):
+        - For PostgreSQL: calls .setup() to create tables
+        - Uses connection pooling for better performance
+        - Handles async operations properly
+        """
         try:
             storage = self.config.get("checkpoint_storage", "memory")
             if storage == "memory":
@@ -275,19 +329,82 @@ class TradingAgentsGraph:
                     logger.error("PostgreSQL URL not configured for checkpointer.")
                     self.checkpointer = None
                     return
+                
+                # Create PostgresSaver with connection string
                 self.checkpointer = PostgresSaver.from_conn_string(pg_url)
-                logger.info("LangGraph PostgresSaver checkpointer initialized.")
+                
+                # Best practice: Call .setup() to create required tables
+                # This is required for first-time setup
+                try:
+                    self.checkpointer.setup()
+                    logger.info("LangGraph PostgresSaver checkpointer initialized and tables created.")
+                except Exception as setup_exc:
+                    # Tables might already exist, which is fine
+                    if "already exists" in str(setup_exc).lower() or "duplicate" in str(setup_exc).lower():
+                        logger.info("LangGraph PostgresSaver checkpointer initialized (tables already exist).")
+                    else:
+                        logger.warning("PostgresSaver.setup() failed (non-critical): %s", setup_exc)
+                        # Continue anyway - tables might already exist
+                
+                logger.info("LangGraph PostgresSaver checkpointer ready for use.")
             else:
                 logger.warning("Unknown checkpoint_storage: %s", storage)
         except ImportError as exc:
             logger.warning(
                 "Checkpointer init failed (missing package?): %s. "
-                "For postgres storage, install langgraph-checkpoint-postgres.", exc
+                "For postgres storage, install: pip install psycopg psycopg-pool langgraph-checkpoint-postgres", exc
             )
             self.checkpointer = None
         except Exception as exc:
             logger.warning("Checkpointer init failed: %s", exc)
             self.checkpointer = None
+    
+    def _init_trading(self):
+        """Initialize trading interface and related components."""
+        try:
+            from tradingagents.trading import AlpacaAdapter, OrderManager, PositionManager
+            from tradingagents.trading.risk_controller import RiskController
+            from tradingagents.trading.order_executor import OrderExecutor
+            
+            # Initialize trading interface
+            trading_config = {
+                "api_key": self.config.get("alpaca_api_key"),
+                "api_secret": self.config.get("alpaca_api_secret"),
+                "paper": self.config.get("alpaca_paper", True),
+                "base_url": self.config.get("alpaca_base_url"),
+            }
+            
+            self.trading_interface = AlpacaAdapter(trading_config)
+            if not self.trading_interface.connect():
+                logger.warning("Failed to connect to trading interface")
+                self.trading_interface = None
+                return
+            
+            # Initialize risk controller
+            risk_config = self.config.get("risk_config", {})
+            self.risk_controller = RiskController(risk_config)
+            
+            # Initialize order executor (pass LLM for structured output parsing)
+            self.order_executor = OrderExecutor(
+                trading_interface=self.trading_interface,
+                risk_controller=self.risk_controller,
+                llm=self.quick_thinking_llm,  # Use quick thinking LLM for parsing
+            )
+            
+            # Initialize managers
+            self.order_manager = OrderManager(self.trading_interface)
+            self.position_manager = PositionManager(self.trading_interface)
+            
+            logger.info("Trading interface initialized")
+        except ImportError as exc:
+            logger.warning(
+                "Trading init failed (missing packages?): %s. "
+                "For trading, install: pip install alpaca-py skfolio", exc
+            )
+            self.trading_interface = None
+        except Exception as exc:
+            logger.warning("Trading init failed: %s", exc)
+            self.trading_interface = None
 
     def _create_routed_llm(self, role_type: str, llm_kwargs: dict):
         """Create an LLM instance via model routing config."""
@@ -399,23 +516,46 @@ class TradingAgentsGraph:
         thread_id = None
         if self.checkpointer is not None:
             thread_id = f"{company_name}-{trade_date}"
+            
+            # Phase 2: Try to recover state if available
+            if self.recovery_engine and self.recovery_engine.can_recover(thread_id):
+                logger.info("Recovering state from checkpoint for thread_id: %s", thread_id)
+                recovered_state = self.recovery_engine.recover_state(thread_id, merge_with_initial=init_agent_state)
+                if recovered_state:
+                    # Use merged state
+                    init_agent_state = recovered_state
+                    logger.info("State recovered and merged successfully")
 
         args = self.propagator.get_graph_args(thread_id=thread_id)
 
+        # Phase 4: Execute with error recovery
         if self.debug:
             # Debug mode with tracing
             trace = []
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
-                    pass
-                else:
-                    chunk["messages"][-1].pretty_print()
-                    trace.append(chunk)
-
-            final_state = trace[-1]
+            def stream_graph():
+                for chunk in self.graph.stream(init_agent_state, **args):
+                    if len(chunk["messages"]) == 0:
+                        pass
+                    else:
+                        chunk["messages"][-1].pretty_print()
+                        trace.append(chunk)
+                return trace[-1] if trace else init_agent_state
+            
+            final_state, error = self.error_recovery.execute_with_retry(stream_graph)
+            if error:
+                logger.error("Graph execution failed after retries: %s", error)
+                # Return partial state if available
+                final_state = trace[-1] if trace else init_agent_state
         else:
             # Standard mode without tracing
-            final_state = self.graph.invoke(init_agent_state, **args)
+            def invoke_graph():
+                return self.graph.invoke(init_agent_state, **args)
+            
+            final_state, error = self.error_recovery.execute_with_retry(invoke_graph)
+            if error:
+                logger.error("Graph execution failed after retries: %s", error)
+                # Return initial state as fallback
+                final_state = init_agent_state
 
         # Store current state for reflection
         self.curr_state = final_state

@@ -16,7 +16,22 @@ def get_fundamentals(ticker: str, curr_date: str = None) -> str:
         "symbol": ticker,
     }
 
-    return _make_api_request("OVERVIEW", params)
+    result = _make_api_request("OVERVIEW", params)
+    
+    # Lineage: record raw fundamentals data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_fundamentals
+        try_record_raw_fundamentals(
+            ticker=ticker,
+            data_type="overview",
+            data=result,
+            source="alpha_vantage",
+            report_date=curr_date,
+        )
+    except Exception:
+        pass
+    
+    return result
 
 
 def get_balance_sheet(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
@@ -35,7 +50,22 @@ def get_balance_sheet(ticker: str, freq: str = "quarterly", curr_date: str = Non
         "symbol": ticker,
     }
 
-    return _make_api_request("BALANCE_SHEET", params)
+    result = _make_api_request("BALANCE_SHEET", params)
+    
+    # Lineage: record raw fundamentals data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_fundamentals
+        try_record_raw_fundamentals(
+            ticker=ticker,
+            data_type="balance_sheet",
+            data=result,
+            source="alpha_vantage",
+            report_date=curr_date,
+        )
+    except Exception:
+        pass
+    
+    return result
 
 
 def get_cashflow(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
@@ -54,7 +84,22 @@ def get_cashflow(ticker: str, freq: str = "quarterly", curr_date: str = None) ->
         "symbol": ticker,
     }
 
-    return _make_api_request("CASH_FLOW", params)
+    result = _make_api_request("CASH_FLOW", params)
+    
+    # Lineage: record raw fundamentals data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_fundamentals
+        try_record_raw_fundamentals(
+            ticker=ticker,
+            data_type="cashflow",
+            data=result,
+            source="alpha_vantage",
+            report_date=curr_date,
+        )
+    except Exception:
+        pass
+    
+    return result
 
 
 def get_income_statement(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
@@ -73,5 +118,20 @@ def get_income_statement(ticker: str, freq: str = "quarterly", curr_date: str = 
         "symbol": ticker,
     }
 
-    return _make_api_request("INCOME_STATEMENT", params)
+    result = _make_api_request("INCOME_STATEMENT", params)
+    
+    # Lineage: record raw fundamentals data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_fundamentals
+        try_record_raw_fundamentals(
+            ticker=ticker,
+            data_type="income_statement",
+            data=result,
+            source="alpha_vantage",
+            report_date=curr_date,
+        )
+    except Exception:
+        pass
+    
+    return result
 

@@ -186,6 +186,21 @@ def get_indicator(
         )
         if data.startswith("Error:"):
             return data
+        
+        # Lineage: record indicator data as market data when DB is enabled
+        try:
+            from tradingagents.graph.lineage import try_record_raw_market_data
+            # Store indicator data as part of market data
+            try_record_raw_market_data(
+                ticker=symbol,
+                trade_date=curr_date,
+                price_data=None,
+                indicators={indicator: data[:1000] if len(data) > 1000 else data},  # Limit size
+                source="alpha_vantage",
+            )
+        except Exception:
+            pass
+        
         return _parse_csv_to_result(
             data, indicator, curr_date_dt, before, curr_date, indicator_descriptions
         )

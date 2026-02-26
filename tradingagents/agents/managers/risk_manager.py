@@ -13,7 +13,7 @@ def create_risk_manager(llm, memory):
         risk_debate_state = state["risk_debate_state"]
         market_research_report = state["market_report"]
         news_report = state["news_report"]
-        fundamentals_report = state["news_report"]
+        fundamentals_report = state["fundamentals_report"]
         sentiment_report = state["sentiment_report"]
         trader_plan = state["investment_plan"]
 
@@ -37,22 +37,10 @@ def create_risk_manager(llm, memory):
             logger.exception("Risk Manager LLM invoke failed")
             content = f"HOLD. Error during risk synthesis: {e}"
 
-        new_risk_debate_state = {
-            "judge_decision": content,
-            "history": risk_debate_state["history"],
-            "aggressive_history": risk_debate_state["aggressive_history"],
-            "conservative_history": risk_debate_state["conservative_history"],
-            "neutral_history": risk_debate_state["neutral_history"],
-            "latest_speaker": "Judge",
-            "current_aggressive_response": risk_debate_state["current_aggressive_response"],
-            "current_conservative_response": risk_debate_state["current_conservative_response"],
-            "current_neutral_response": risk_debate_state["current_neutral_response"],
-            "count": risk_debate_state["count"],
-        }
-
-        return {
-            "risk_debate_state": new_risk_debate_state,
-            "final_trade_decision": content,
-        }
+        # Use StateManager to update state
+        from tradingagents.graph.state_manager import StateManager
+        state_manager = StateManager()
+        state_update = state_manager.update_risk_manager_decision(state, content)
+        return state_update
 
     return risk_manager_node

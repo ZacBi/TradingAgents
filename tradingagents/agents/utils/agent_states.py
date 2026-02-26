@@ -53,6 +53,23 @@ class ExpertEvaluationState(TypedDict):
     raw_response: Annotated[str, "Raw LLM response"]
 
 
+def create_msg_delete():
+    """Create a function to clear messages and add placeholder for Anthropic compatibility."""
+    def delete_messages(state):
+        """Clear messages and add placeholder for Anthropic compatibility"""
+        messages = state["messages"]
+
+        # Remove all messages
+        removal_operations = [RemoveMessage(id=m.id) for m in messages]
+
+        # Add a minimal placeholder message
+        placeholder = HumanMessage(content="Continue")
+
+        return {"messages": removal_operations + [placeholder]}
+
+    return delete_messages
+
+
 class AgentState(MessagesState):
     company_of_interest: Annotated[str, "Company that we are interested in trading"]
     trade_date: Annotated[str, "What date we are trading at"]

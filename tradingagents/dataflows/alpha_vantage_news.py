@@ -21,7 +21,36 @@ def get_news(ticker, start_date, end_date) -> dict[str, str] | str:
         "time_to": format_datetime_for_api(end_date),
     }
 
-    return _make_api_request("NEWS_SENTIMENT", params)
+    result = _make_api_request("NEWS_SENTIMENT", params)
+    
+    # Lineage: record raw news data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_news
+        # Parse result if it's a dict, extract news items
+        if isinstance(result, dict) and "feed" in result:
+            for item in result.get("feed", [])[:50]:  # Limit to 50 items
+                try_record_raw_news(
+                    ticker=ticker,
+                    source="alpha_vantage",
+                    title=item.get("title"),
+                    content=item.get("summary"),
+                    url=item.get("url"),
+                    published_at=item.get("time_published"),
+                )
+        elif isinstance(result, str):
+            # If it's a string, try to record it as a single news item
+            try_record_raw_news(
+                ticker=ticker,
+                source="alpha_vantage",
+                title=None,
+                content=result[:1000] if len(result) > 1000 else result,  # Limit size
+                url=None,
+                published_at=None,
+            )
+    except Exception:
+        pass
+    
+    return result
 
 def get_global_news(curr_date, look_back_days: int = 7, limit: int = 50) -> dict[str, str] | str:
     """Returns global market news & sentiment data without ticker-specific filtering.
@@ -50,7 +79,35 @@ def get_global_news(curr_date, look_back_days: int = 7, limit: int = 50) -> dict
         "limit": str(limit),
     }
 
-    return _make_api_request("NEWS_SENTIMENT", params)
+    result = _make_api_request("NEWS_SENTIMENT", params)
+    
+    # Lineage: record raw news data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_news
+        # Parse result if it's a dict, extract news items
+        if isinstance(result, dict) and "feed" in result:
+            for item in result.get("feed", [])[:limit]:
+                try_record_raw_news(
+                    ticker=None,  # Global news, no specific ticker
+                    source="alpha_vantage",
+                    title=item.get("title"),
+                    content=item.get("summary"),
+                    url=item.get("url"),
+                    published_at=item.get("time_published"),
+                )
+        elif isinstance(result, str):
+            try_record_raw_news(
+                ticker=None,
+                source="alpha_vantage",
+                title=None,
+                content=result[:1000] if len(result) > 1000 else result,
+                url=None,
+                published_at=None,
+            )
+    except Exception:
+        pass
+    
+    return result
 
 
 def get_insider_transactions(symbol: str) -> dict[str, str] | str:
@@ -69,4 +126,33 @@ def get_insider_transactions(symbol: str) -> dict[str, str] | str:
         "symbol": symbol,
     }
 
-    return _make_api_request("INSIDER_TRANSACTIONS", params)
+    result = _make_api_request("INSIDER_TRANSACTIONS", params)
+    
+    # Lineage: record insider transactions as news data when DB is enabled
+    try:
+        from tradingagents.graph.lineage import try_record_raw_news
+        # Record insider transactions as news-like data
+        if isinstance(result, dict):
+            transactions = result.get("transactions", [])
+            for trans in transactions[:50]:  # Limit to 50 transactions
+                try_record_raw_news(
+                    ticker=symbol,
+                    source="alpha_vantage",
+                    title=f"Insider Transaction: {trans.get('transaction_type', 'Unknown')}",
+                    content=str(trans),
+                    url=None,
+                    published_at=trans.get("transaction_date"),
+                )
+        elif isinstance(result, str):
+            try_record_raw_news(
+                ticker=symbol,
+                source="alpha_vantage",
+                title="Insider Transactions",
+                content=result[:1000] if len(result) > 1000 else result,
+                url=None,
+                published_at=None,
+            )
+    except Exception:
+        pass
+    
+    return result
