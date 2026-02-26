@@ -1,30 +1,20 @@
 
-# Import from vendor-specific modules
-from .alpha_vantage import (
+# Import from vendor-specific modules (directly, without facade)
+from .alpha_vantage_fundamentals import (
     get_balance_sheet as get_alpha_vantage_balance_sheet,
-)
-from .alpha_vantage import (
     get_cashflow as get_alpha_vantage_cashflow,
-)
-from .alpha_vantage import (
     get_fundamentals as get_alpha_vantage_fundamentals,
-)
-from .alpha_vantage import (
-    get_global_news as get_alpha_vantage_global_news,
-)
-from .alpha_vantage import (
     get_income_statement as get_alpha_vantage_income_statement,
 )
-from .alpha_vantage import (
-    get_indicator as get_alpha_vantage_indicator,
-)
-from .alpha_vantage import (
+from .alpha_vantage_news import (
+    get_global_news as get_alpha_vantage_global_news,
     get_insider_transactions as get_alpha_vantage_insider_transactions,
-)
-from .alpha_vantage import (
     get_news as get_alpha_vantage_news,
 )
-from .alpha_vantage import (
+from .alpha_vantage_indicator import (
+    get_indicator as get_alpha_vantage_indicator,
+)
+from .alpha_vantage_stock import (
     get_stock as get_alpha_vantage_stock,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError

@@ -1,7 +1,7 @@
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-from tradingagents.agents.utils.agent_utils import get_news
+from tradingagents.agents.utils.news_data_tools import get_news
 from tradingagents.prompts import PromptNames, get_prompt_manager
 
 

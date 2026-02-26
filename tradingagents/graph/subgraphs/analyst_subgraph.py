@@ -15,7 +15,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents.utils.agent_states import AgentState
-from tradingagents.agents.utils.agent_utils import create_msg_delete
+from tradingagents.agents.utils.agent_states import create_msg_delete
 
 # 分析师类型 → AgentState 中输出报告字段的映射
 ANALYST_REPORT_FIELD: dict[str, str] = {
