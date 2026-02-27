@@ -1,4 +1,4 @@
-from . import portfolio, decisions
+from . import portfolio, decisions, datafeed
 
-__all__ = ["portfolio", "decisions"]
+__all__ = ["portfolio", "decisions", "datafeed"]
 
