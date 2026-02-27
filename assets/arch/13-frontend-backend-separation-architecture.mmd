@@ -1,0 +1,45 @@
+graph TB
+    subgraph "前端层"
+        A[Web Dashboard<br/>React/Vue] -->|HTTP/WebSocket| B[API Gateway<br/>FastAPI]
+        C[Mobile App<br/>React Native] -->|HTTP/WebSocket| B
+        D[CLI<br/>保留] -->|直接调用| E[Core Engine]
+    end
+    
+    subgraph "API网关层"
+        B --> F[认证服务<br/>JWT/OAuth2]
+        B --> G[路由服务<br/>FastAPI Router]
+    end
+    
+    subgraph "后端服务层"
+        G --> H[分析服务<br/>Analysis API]
+        G --> I[交易服务<br/>Trading API]
+        G --> J[数据服务<br/>Data API]
+        G --> K[监控服务<br/>Monitoring API]
+        G --> L[任务服务<br/>Task API]
+    end
+    
+    subgraph "核心引擎层"
+        H --> E[TradingAgentsGraph<br/>LangGraph]
+        I --> E
+        J --> M[Data Accessor<br/>缓存层]
+        L --> N[Scheduler<br/>APScheduler]
+        N --> E
+    end
+    
+    subgraph "数据层"
+        E --> O[PostgreSQL<br/>Checkpoint + 业务数据]
+        M --> P[Redis<br/>缓存 + 任务队列]
+        E --> Q[Langfuse<br/>可观测性]
+    end
+    
+    subgraph "外部服务"
+        I --> R[Alpaca API<br/>交易接口]
+        M --> S[数据源<br/>yfinance/AlphaVantage]
+        E --> T[LLM API<br/>OpenAI/Gemini]
+    end
+    
+    subgraph "监控层"
+        K --> U[Prometheus<br/>指标收集]
+        U --> V[Grafana<br/>可视化]
+        Q --> W[Langfuse UI<br/>LLM追踪]
+    end
