@@ -1,0 +1,24 @@
+graph TB
+    subgraph "前端页面布局"
+        A[仪表盘 Dashboard] --> B[持仓概览<br/>总资产、盈亏、NAV曲线]
+        A --> C[最新决策<br/>最近5条决策]
+        A --> D[实时信息流<br/>最新数据更新]
+        
+        E[持仓页面 Positions] --> F[持仓列表<br/>ticker, quantity, pnl]
+        E --> G[持仓详情<br/>成本价、当前价、盈亏]
+        
+        H[决策历史 Decisions] --> I[决策列表<br/>筛选、搜索]
+        H --> J[决策详情<br/>各Agent输出]
+        
+        K[信息流页面 Datafeed] --> L[实时数据流<br/>市场数据、新闻、指标]
+        K --> M[数据筛选<br/>按类型、ticker]
+    end
+    
+    subgraph "WebSocket实时更新"
+        N[持仓变化] --> A
+        N --> E
+        O[新决策] --> A
+        O --> H
+        P[新数据] --> A
+        P --> K
+    end
